@@ -5,5 +5,5 @@
 # RESULTS is a hash of "username" => ["subreddit", ...]
 
 WALKERS.each do |walker|
-  HISTORY[walker[:username]] = run_walk(WORLD, STATS, walker)
+  RESULTS[walker[:username]] = run_walk(WORLD, STATS, walker)
 end
