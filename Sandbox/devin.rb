@@ -4,7 +4,9 @@ def run_walk(world, stats, username, current_node, transit_count)
     if rand < stats["self_loops"][current_node]
       transits << current_node
     else
-      transits << world[current_node].shuffle.first
+      # for the love of Christ, don't shuffle; it reorders in memory. Far less expensive to pick a random index.
+      neighbors = world[current_node]
+      transits << neighbors[rand(neighbors.length)]
     end
     current_node = transits.last
   end
