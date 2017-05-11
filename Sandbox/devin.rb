@@ -1,4 +1,6 @@
-def run_walk(world, stats, username, current_node, transit_count)
+def run_walk(world, stats, walker)
+  current_node = walker[:current_node]
+  transit_count = walker[:transit_count]
   transits = []
   transit_count.to_i.times do |t|
     if rand < stats["self_loops"][current_node]
