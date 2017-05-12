@@ -8,7 +8,7 @@ require 'csv'
 require 'json'
 
 def read_initial_net
-  net = JSON.parse(File.read("initial_net.json"))
+  net = JSON.parse(File.read("data/initial_net.json"))
   (net.keys|net.values.flatten).each do |subreddit|
     net[subreddit] ||= []
   end
@@ -22,8 +22,8 @@ def update_walkers(day)
   updated = []
 
   timer.time(:loading_files) {
-    counts = Hash[CSV.read("user_counts/#{day}")]
-    user_starts = Hash[CSV.read("user_starts/#{day}")]
+    counts = Hash[CSV.read("data/user_counts/#{day}")]
+    user_starts = Hash[CSV.read("data/user_starts/#{day}")]
   }
 
   timer.time(:building_updated) {
@@ -47,7 +47,7 @@ def update_walkers(day)
 end
 
 def update_net(day)
-  new_edges = CSV.read("edge_creation/#{day}")
+  new_edges = CSV.read("data/edge_creation/#{day}")
   all_subs = new_edges.flatten.uniq
   new_edges.each do |edge|
     if edge.first != edge.last
@@ -72,7 +72,7 @@ def update_stats(day)
   self_loops = nil
 
   timer.time(:loading_files) {
-    self_loops = Hash[CSV.read("self_loop_percents/#{day}")]
+    self_loops = Hash[CSV.read("data/self_loop_percents/#{day}")]
   }
 
   timer.time(:updating_stats) {
@@ -148,7 +148,7 @@ WORLD = read_initial_net
 STATS = initial_stats
 WALKERS = []
 THREAD_COUNT = 4
-days = `ls user_counts`.split("\n")
+days = `ls data/user_counts`.split("\n")
 
 def total_outbound
   sum = 0
