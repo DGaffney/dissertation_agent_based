@@ -66,10 +66,11 @@ def update_net(day)
 end
 
 def initial_stats
+  stats = {}
   WORLD.each do |subreddit, edges|
-    STATS[subreddit] ||= {self_loop_percent: rand/10000}
+    stats[subreddit] ||= {self_loop_percent: rand/10000}
   end
-  return STATS
+  return stats
 end
 
 def update_stats(day)
@@ -91,16 +92,16 @@ def update_stats(day)
   # timer.summary()
 end
 
-def run_walk(world, stats, walker)
+def run_walk(walker)
   current_node = walker[:current_node]
   transit_count = walker[:transit_count]
   transits = []
 
   transit_count.times do |t|
-    if rand < (stats[current_node] && stats[current_node][:self_loop_percent] || rand/10000) || (world[current_node].nil? || world[current_node].length == 0)
+    if rand < (STATS[current_node] && STATS[current_node][:self_loop_percent] || rand/10000) || (WORLD[current_node].nil? || WORLD[current_node].length == 0)
       transits << current_node
     else
-      neighbors = world[current_node]
+      neighbors = WORLD[current_node]
       transits << neighbors[rand(neighbors.length)]
     end
   end
@@ -142,7 +143,7 @@ days.each do |day|
 
   todays_walkers = []
 
-  day_timer.time(:update_walkers) {
+  day_timer.time(:create_walkers) {
     todays_walkers = create_walkers(day)
   }
 
@@ -156,7 +157,7 @@ days.each do |day|
 
   day_timer.time(:walkers) {
     todays_walkers.each do |walker|
-      history = run_walk(WORLD, STATS, walker)
+      history = run_walk(walker)
       update_last_visit(walker, history)
       total_transits += history.length
     end
