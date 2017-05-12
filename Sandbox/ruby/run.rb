@@ -1,12 +1,14 @@
 # WORLD is static global hash of "subreddit" => ["outbound_subreddit", ...]
 # STATS is a static global hash of "subreddit" => { attribute: value }
 # LAST_VISIT is a static global hash of "username" => "subreddit"
-# result_output is a hash of "username" => ["subreddit", ...]
 
 require 'csv'
 require 'json'
 
 require './timer'
+
+# this will turn off the Timer classes so that they don't log or report anything
+SUPPRESS_TIMER = true
 
 def read_initial_net
   net = JSON.parse(File.read("../data/initial_net.json"))
@@ -27,7 +29,7 @@ def create_walkers(day)
     user_starts = Hash[CSV.read("../data/user_starts/#{day}")]
   }
 
-  timer.time(:building_updated) {
+  timer.time(:building_walkers) {
     counts.each_pair do |username, count|
       walker = { username: username, transit_count: count.to_i }
       if LAST_VISIT[username]
@@ -107,13 +109,13 @@ end
 
 
 
-result_output = {}
 STATS = {}
 
 WORLD = read_initial_net
 STATS = initial_stats
 LAST_VISIT = {}
-THREAD_COUNT = 4
+total_walks = 0
+
 days = `ls ../data/user_counts`.split("\n")
 
 def total_outbound
@@ -124,37 +126,43 @@ def total_outbound
   sum
 end
 
+
+simulation_start = Time.now
 days.each do |day|
-  timer = Timer.new("Overall", 1)
+  day_timer = Timer.new("Day", 1)
   puts "-----"
   puts day
   puts "LAST_VISIT.length #{LAST_VISIT.length}"
   puts "STATS.length #{STATS.length}"
   puts "WORLD.length #{WORLD.length}"
   puts "outbound sum #{total_outbound}"
+  puts "total_walks #{total_walks}"
   puts "..."
 
   todays_walkers = []
-  result_output = {}
 
-  timer.time(:update_walkers) {
+  day_timer.time(:update_walkers) {
     todays_walkers = create_walkers(day)
   }
 
-  timer.time(:update_net) {
+  day_timer.time(:update_net) {
     update_net(day)
   }
 
-  timer.time(:update_stats) {
+  day_timer.time(:update_stats) {
     update_stats(day)
   }
 
-  timer.time(:walkers) {
+  day_timer.time(:walkers) {
     todays_walkers.each do |walker|
       history = run_walk(WORLD, STATS, walker)
       update_last_visit(walker, history)
+      total_walks += 1
     end
   }
 
-  timer.summary()
+  day_timer.summary()
 end
+elapsed = Time.now - simulation_start
+puts "Elapsed: #{elapsed} seconds"
+puts "Walks/Second: #{(total_walks / elapsed).to_i}"
