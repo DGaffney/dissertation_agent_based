@@ -2,10 +2,11 @@
 # STATS is a static global hash of "subreddit" => { attribute: value }
 # WALKERS is a static global list of { username: "derpderp", starting_sub: "some_subreddit", post_count: 10 }
 # HISTORY is a static global hash of "username" => ["subreddit", ...]
-# RESULTS is a hash of "username" => ["subreddit", ...]
-load 'devin.rb'
+# result_output is a hash of "username" => ["subreddit", ...]
+
 require 'csv'
 require 'json'
+
 def read_initial_net
   net = JSON.parse(File.read("initial_net.json"))
   (net.keys|net.values.flatten).each do |subreddit|
@@ -15,20 +16,34 @@ def read_initial_net
 end
 
 def update_walkers(day)
-  counts = Hash[CSV.read("user_counts/#{day}")]
-  user_starts = Hash[CSV.read("user_starts/#{day}")]
+  timer = Timer.new("Update Walkers", 2)
+  counts = nil
+  user_starts = nil
   updated = []
-  WALKERS.each do |walker|
-    if counts[walker[:username]]
-      walker[:transit_count] = counts[walker[:username]].to_i
-      updated << walker[:username]
-    else
-      walker[:transit_count] = 0
+
+  timer.time(:loading_files) {
+    counts = Hash[CSV.read("user_counts/#{day}")]
+    user_starts = Hash[CSV.read("user_starts/#{day}")]
+  }
+
+  timer.time(:building_updated) {
+    WALKERS.each do |walker|
+      if counts[walker[:username]]
+        walker[:transit_count] = counts[walker[:username]].to_i
+        updated << walker[:username]
+      else
+        walker[:transit_count] = 0
+      end
     end
-  end
-  (counts.keys-updated).each do |new_walker|
-    WALKERS << {username: new_walker, current_node: user_starts[new_walker], transit_count: counts[new_walker].to_i}
-  end
+  }
+
+  timer.time(:appending_new_walkers) {
+    (counts.keys-updated).each do |new_walker|
+      WALKERS << {username: new_walker, current_node: user_starts[new_walker], transit_count: counts[new_walker].to_i}
+    end
+  }
+
+  timer.summary()
 end
 
 def update_net(day)
@@ -53,25 +68,138 @@ def initial_stats
 end
 
 def update_stats(day)
-  self_loops = Hash[CSV.read("self_loop_percents/#{day}")]
-  WORLD.keys.each do |subreddit, stat_hash|
-    STATS[subreddit] ||= {self_loop_percent: rand/10000}
-    STATS[subreddit][:self_loop_percent] ||= self_loops[subreddit]||STATS[subreddit][:self_loop_percent]||rand/10000
-  end
+  timer = Timer.new("Update Stats", 2)
+  self_loops = nil
+
+  timer.time(:loading_files) {
+    self_loops = Hash[CSV.read("self_loop_percents/#{day}")]
+  }
+
+  timer.time(:updating_stats) {
+    WORLD.keys.each do |subreddit, stat_hash|
+      STATS[subreddit] ||= {self_loop_percent: rand/10000}
+      STATS[subreddit][:self_loop_percent] ||= self_loops[subreddit]||STATS[subreddit][:self_loop_percent]||rand/10000
+    end
+  }
+
+  # negligible time; don't polute the output here.
+  # timer.summary()
 end
-RESULTS = {}
+
+def run_walk(world, stats, walker)
+  current_node = walker[:current_node]
+  transit_count = walker[:transit_count]
+  transits = []
+
+  transit_count.times do |t|
+    if rand < (stats[current_node] && stats[current_node][:self_loop_percent] || rand/10000) || (world[current_node].nil? || world[current_node].length == 0)
+      transits << current_node
+    else
+      neighbors = world[current_node]
+      transits << neighbors[rand(neighbors.length)]
+    end
+    walker[:current_node] = transits.last
+  end
+
+  return transits
+end
+
+class Timer
+
+  def initialize(name, padding = 0)
+    @timers = {}
+    @total = 0
+    @padding = "\t" * padding
+    @name = name
+  end
+
+  def time(key)
+    start_time = Time.now
+    yield
+    end_time = Time.now
+    elapsed = (end_time - start_time) * 1000.0
+    @total += elapsed
+
+    if @timers[key]
+      @timers[key] += elapsed
+    else
+      @timers[key] = elapsed
+    end
+  end
+
+  def pct(key)
+    return 0 if @total <= 0
+    @timers[key].to_f / @total.to_f
+  end
+
+  def summary
+    @timers.each_pair do |key, ms|
+      puts "#{@padding}#{key}: #{ms.to_i}ms, #{(pct(key) * 100).to_i}%"
+    end
+    puts "#{@padding}#{@name} TOTAL: #{@total.to_i}ms"
+  end
+
+end
+
+result_output = {}
 STATS = {}
+
 WORLD = read_initial_net
 STATS = initial_stats
-days = `ls user_counts`.split("\n")
 WALKERS = []
-days.each do |day|
-  puts day
-  RESULTS = {}
-  update_walkers(day)
-  update_net(day)
-  update_stats(day)
-  WALKERS.each do |walker|
-    RESULTS[walker[:username]] = run_walk(WORLD, STATS, walker)
+THREAD_COUNT = 4
+days = `ls user_counts`.split("\n")
+
+def total_outbound
+  sum = 0
+  WORLD.each_value do |outs|
+    sum += outs.length
   end
+  sum
+end
+
+days.each do |day|
+  timer = Timer.new("Overall", 1)
+  puts "-----"
+  puts day
+  puts "WALKERS.length #{WALKERS.length}"
+  puts "STATS.length #{STATS.length}"
+  puts "WORLD.length #{WORLD.length}"
+  puts "\toutbound sum #{total_outbound}"
+  puts "..."
+
+  result_output = {}
+  timer.time(:update_walkers) {
+    update_walkers(day)
+  }
+
+  timer.time(:update_net) {
+    update_net(day)
+  }
+
+  timer.time(:update_stats) {
+    update_stats(day)
+  }
+
+  timer.time(:walkers) {
+    # build a Queue of walkers; threadsafe!
+    walker_queue = WALKERS.inject(Queue.new, :push)
+    threads = Array.new(THREAD_COUNT) do
+      Thread.new do
+        until walker_queue.empty?
+          run_walk(WORLD, STATS, walker_queue.pop)
+        end
+      end
+    end
+
+    threads.each(&:join)
+
+    # WALKERS.each_slice(BATCH_SIZE) do |walker_batch|
+    #   walker_batch.each do |walker|
+    #     run_walk(WORLD, STATS, walker)
+    #   end
+    # end
+  }
+
+  timer.summary()
 end
