@@ -109,10 +109,6 @@ def run_walk(walker)
   return transits
 end
 
-
-
-STATS = {}
-
 WORLD = read_initial_net
 STATS = initial_stats
 LAST_VISIT = {}
