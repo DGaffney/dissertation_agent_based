@@ -7,7 +7,8 @@ require 'json'
 
 require './timer'
 
-# this will turn off the Timer classes so that they don't log or report anything
+# this will turn off the Timer classes so that they don't log or report
+# on the inner workings of the horrible machinery
 SUPPRESS_TIMER = true
 
 def read_initial_net
@@ -114,7 +115,7 @@ STATS = {}
 WORLD = read_initial_net
 STATS = initial_stats
 LAST_VISIT = {}
-total_walks = 0
+total_transits = 0
 
 days = `ls ../data/user_counts`.split("\n")
 
@@ -136,7 +137,7 @@ days.each do |day|
   puts "STATS.length #{STATS.length}"
   puts "WORLD.length #{WORLD.length}"
   puts "outbound sum #{total_outbound}"
-  puts "total_walks #{total_walks}"
+  puts "total_transits #{total_transits}"
   puts "..."
 
   todays_walkers = []
@@ -157,7 +158,7 @@ days.each do |day|
     todays_walkers.each do |walker|
       history = run_walk(WORLD, STATS, walker)
       update_last_visit(walker, history)
-      total_walks += 1
+      total_transits += history.length
     end
   }
 
@@ -165,4 +166,4 @@ days.each do |day|
 end
 elapsed = Time.now - simulation_start
 puts "Elapsed: #{elapsed} seconds"
-puts "Walks/Second: #{(total_walks / elapsed).to_i}"
+puts "Transits/Second: #{(total_transits / elapsed).to_i}"
