@@ -1,0 +1,5 @@
+91012c
+  - ruby/run.rb
+  - 223k transits/sec
+  - MRI Ruby 2.4.1
+  - Peat's laptop (2014 1.7GHz i7 MacBook Air)
