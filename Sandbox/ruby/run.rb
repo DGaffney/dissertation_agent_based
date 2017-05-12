@@ -133,12 +133,12 @@ days.each do |day|
   day_timer = Timer.new("Day", 1)
   puts "-----"
   puts day
-  puts "LAST_VISIT.length #{LAST_VISIT.length}"
-  puts "STATS.length #{STATS.length}"
-  puts "WORLD.length #{WORLD.length}"
-  puts "outbound sum #{total_outbound}"
-  puts "total_transits #{total_transits}"
-  puts "..."
+  puts "Cumulative data:"
+  puts "  Members: #{LAST_VISIT.length}"
+  puts "  Subreddits: #{WORLD.length}"
+  puts "  Edges: #{total_outbound}"
+  puts "  Transits: #{total_transits}"
+  puts "-----"
 
   todays_walkers = []
 
