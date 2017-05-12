@@ -3,6 +3,7 @@
 # WALKERS is a static global list of { username: "derpderp", starting_sub: "some_subreddit", post_count: 10 }
 # HISTORY is a static global hash of "username" => ["subreddit", ...]
 # RESULTS is a hash of "username" => ["subreddit", ...]
+load 'devin.rb'
 require 'csv'
 require 'json'
 def read_initial_net
