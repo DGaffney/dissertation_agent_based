@@ -4,6 +4,13 @@
   (:gen-class))
 
 
+;; Configuration derpage
+
+(def ROOT_NODE :reddit.com) ; always available from any sub
+(def BATCH_SIZE 50) ; defines the batch size for walking
+
+
+;; STATE -----------------------------------------------------------------------
 
 (def WORLD (atom {}))
 (def SELF_LOOP_PCT (atom {}))
@@ -12,8 +19,6 @@
 (def TRANSITS (atom 0))
 (def ELAPSED_MS (atom 0))
 
-(def ROOT_NODE :reddit.com)
-(def BATCH_SIZE 50) ; defines the batch size for walking
 
 ;; FILE READERS ----------------------------------------------------------------
 
@@ -40,25 +45,29 @@
 (defn initialize-world!
   "Reads in original state for the world"
   []
-  (let [world (slurp-json "../data/initial_net.json")]
-    ; "world" is reasonably complete, but needs some cleanup.
-    (reset! WORLD world)
+  (let [world-src (slurp-json "../data/initial_net.json")]
 
     ; let's ensure that all subs have the correct data structure -- {:subreddit []}
-    (doseq [sub (distinct (flatten (vals @WORLD)))]
+    (doseq [sub (distinct (flatten (vals world-src)))]
       (if (not (contains? @WORLD (keyword sub)))
         (swap! WORLD assoc (keyword sub) [ROOT_NODE])))
 
-    ; now, let's ensure that all of the outbound neighbors are keywords
-    (doseq [sub (keys @WORLD)]
-      (swap! WORLD assoc sub (map keyword (get @WORLD sub))))))
+    ; ensure that all of the outbound neighbors are keywords
+    (doseq [sub (keys world-src)]
+      (swap! WORLD assoc sub (map keyword (get world-src sub))))
+
+    ; ensure that all neighbor lists can exit back to ROOT_NODE
+    (doseq [sub (keys world-src)]
+      (if (empty? (get @WORLD sub))
+        (swap! WORLD assoc (keyword sub) [ROOT_NODE])))))
 
 (defn ensure-node
   "Ensures a key with a default value exists in a hashmap if it doesn't already"
   [m key]
-  (if (contains? m key)
-    m
-    (assoc m key [ROOT_NODE])))
+  (let [kw (keyword key)] ; endure we're dealing with a keyword
+    (if (contains? m kw)
+      m
+      (assoc m kw [ROOT_NODE]))))
 
 (defn add-edge
   "Ensures the origin and destination nodes exists, and adds an edge"
@@ -66,14 +75,14 @@
   (let [[origin destination] edge-pair
         new-world            (-> world (ensure-node origin) (ensure-node destination))
         original-edges       (get new-world origin)
-        new-edges            (set (conj original-edges destination))]
+        new-edges            (set (conj original-edges destination))] ; set ensures all values are unique
         (assoc new-world origin new-edges)))
 
 (defn build-updated-world
   "Builds an updated copy of the world"
   [world day]
-  (loop [edges (slurp-csv (str "../larger_data/edge_creation/" day))
-         new-world world]
+  (loop [edges      (slurp-csv (str "../larger_data/edge_creation/" day)) ; start with raw list of edges for the day
+         new-world  world]
     (if (empty? edges)
       new-world ; return the new world with all of it's edges
       (recur (rest edges)
@@ -162,7 +171,8 @@
 (defn create-walkers
   "Returns a list of walkers for a given day."
   [day]
-  (map #(apply create-walker %) (slurp-user-counts day)))
+  (doall
+    (map #(apply create-walker %) (slurp-user-counts day))))
 
 
 ;; WALKING LOGIC ---------------------------------------------------------------
@@ -178,8 +188,7 @@
 (defn random-neighbor
   "Selects a random neighbor"
   [current-node]
-  (let [neighbors (-> @WORLD current-node)]
-    (rand-nth neighbors)))
+  (-> @WORLD current-node rand-nth))
 
 (defn walk
   "Performs a single traverse"
@@ -202,66 +211,119 @@
           (recur (conj history (walk first-step)))
           (recur (conj history (walk (last history)))))))))
 
-
-(defn millis
-  []
-  (System/currentTimeMillis))
-
-(defn total-edges
-  [world]
-  (loop [edge-count 0
-         node-keys (keys world)]
-    (if (empty? node-keys)
-      edge-count
-      (recur (+ edge-count (count (get world (first node-keys))))
-             (rest node-keys)))))
-
 (defn run-and-measure-walk
   [walker]
-  (let [history (random-walk walker)]
+  (let [history (random-walk walker)] ; this is where WORLD gets inserted
     (set-last-visit (:username walker) (last history))
     (swap! TRANSITS + (count history)))
   true)
 
 (defn run-batch
   [walkers]
-  (doall (map run-and-measure-walk walkers)))
+  (doall ; force the map to execute
+    (map run-and-measure-walk walkers)))
 
-(defn split-up
+(defn create-batches
   [walkers]
   (partition BATCH_SIZE BATCH_SIZE [] walkers))
 
+
+;; UTILITY FNs -----------------------------------------------------------------
+
+(defn millis
+  "Provides the current time in milliseconds for timing purposes"
+  []
+  (System/currentTimeMillis))
+
+(defn transits-per-second
+  "Provides the current number of transits per second"
+  []
+  (* 1000 (quot @TRANSITS @ELAPSED_MS)))
+
+(defn total-edges
+  "Counts all of the edges contained in the provided world"
+  [world]
+  (loop [edge-count 0
+         node-keys (keys world)]
+    (if (empty? node-keys)
+      edge-count ; no more node keys, so we'll return the total edge count
+      ; ... otherwise, continue stepping through the node keys and counting the edges for each
+      (let [current-node    (first node-keys)
+            current-count   (count (get world current-node))
+            remaining-nodes (rest node-keys)]
+        (recur (+ edge-count current-count) remaining-nodes)))))
+
+
+
+
+;; YOLO EXCEPT IN SIMULATIONS --------------------------------------------------
+
 (defn -main
   [& args]
+
+  ; Set up the initial state of the universe
   (reset! DAYS (initial-days))
   (initialize-world!)
   (reset! SELF_LOOP_PCT (initial-self-loop-pct @WORLD))
 
-  (try
-    (doseq [day @DAYS]
-      (println day)
+  ; BEGIN MAIN RUN LOOP
+  (doseq [day @DAYS]
+    ; timestamp the start of this iteration
+    (def iteration-start-ms (millis))
 
-      (def start-time (millis))
+    ; Make world adjustments; these have to be done in sequence: world, loops, visits
+    (def update-world-start-ms (millis))
+    (update-world! day)
+    (def update-world-end-ms (millis))
 
-          (update-world! day)
-          (update-self-loop-pct! day)
-          (update-last-visits! day)
+    (def update-loops-start-ms (millis))
+    (update-self-loop-pct! day)
+    (def update-loops-end-ms (millis))
 
-          (let [walkers (create-walkers day)]
-            (dorun
-              (pmap run-batch (split-up walkers))))
+    (def update-visits-start-ms (millis))
+    (update-last-visits! day)
+    (def update-visits-end-ms (millis))
 
+    (def create-walkers-start-ms (millis))
+    (def current-walkers (create-walkers day))
+    (def create-walkers-end-ms (millis))
 
-      (def local-elapsed (- (millis) start-time))
-      (swap! ELAPSED_MS + local-elapsed)
+    (def run-walkers-start-ms (millis))
+    (dorun ; force realization
+      (pmap ; executes each of the run-batch functions in parallel
+        run-batch
+          (create-batches current-walkers)))
+    (def run-walkers-end-ms (millis))
 
-      (println (str "Iteration: " local-elapsed "ms, " (* 1000 (quot @TRANSITS @ELAPSED_MS)) " transits/sec for " (quot @ELAPSED_MS 1000) " seconds" )))
+    ; total time (in ms) for executing this iteration of the simulation
+    (def iteration-elapsed (- (millis) iteration-start-ms))
 
-  (catch Exception e
-    (println (str "caught exception: " (.getMessage e)))))
+    ; record the execution time
+    (swap! ELAPSED_MS + iteration-elapsed)
 
+    ; status strings
+    (println
+      (str day ": " iteration-elapsed "ms, " (transits-per-second) " transits/sec"))
+    (println
+      (str "\tUpdate world (ms): " (- update-world-end-ms update-world-start-ms)))
+    (println
+      (str "\tUpdate self loops (ms): " (- update-loops-end-ms update-loops-start-ms)))
+    (println
+      (str "\tUpdate visit starts (ms): " (- update-visits-end-ms update-visits-start-ms)))
+    (println
+      (str "\tCreate walkers (ms): " (- create-walkers-end-ms create-walkers-start-ms)))
+    (println
+      (str "\tActive walkers: " (count current-walkers)))
+    (println
+      (str "\tRun walkers (ms): " (- run-walkers-end-ms run-walkers-start-ms)))
+
+  ) ; END MAIN RUN LOOP
+
+  ; ... and print out final stats!
+  (println (str "Days: " (count @DAYS)))
   (println (str "World size: " (count @WORLD)))
   (println (str "Unique edges: " (total-edges @WORLD)))
   (println (str "Total Walkers: " (count @LAST_VISITS)))
   (println (str "Transits: " @TRANSITS))
+  (println (str "Run time (seconds): " (quot @ELAPSED_MS 1000.0)))
 )
