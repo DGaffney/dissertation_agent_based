@@ -8,5 +8,5 @@
                  [org.clojure/data.csv "0.1.3"]]
   :main ^:skip-aot machinery.core
   :target-path "target/%s"
-  :jvm-opts ["-Xmx4g"]
+  :jvm-opts ["-Xmx8g"]
   :profiles {:uberjar {:aot :all}})
