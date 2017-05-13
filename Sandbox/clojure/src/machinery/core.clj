@@ -7,7 +7,7 @@
 ;; Configuration derpage
 
 (def ROOT_NODE :reddit.com) ; always available from any sub
-(def BATCH_SIZE 50) ; defines the batch size for walking
+(def BATCH_SIZE 1000) ; defines the batch size for walking
 
 
 ;; STATE -----------------------------------------------------------------------
@@ -19,6 +19,16 @@
 (def TRANSITS (atom 0))
 (def ELAPSED_MS (atom 0))
 
+
+;; TIMING MACRO ----------------------------------------------------------------
+
+(defmacro bench
+  "Times the execution of forms, discarding their output and returning
+a long in ms."
+  ([& forms]
+    `(let [start# (System/currentTimeMillis)]
+       ~@forms
+       (- (System/currentTimeMillis) start#))))
 
 ;; FILE READERS ----------------------------------------------------------------
 
@@ -78,10 +88,15 @@
         new-edges            (set (conj original-edges destination))] ; set ensures all values are unique
         (assoc new-world origin new-edges)))
 
+(defn slurp-edges
+  "Loads raw edges from disk; prefetches the next day!"
+  [day]
+  (slurp-csv (str "../larger_data/edge_creation/" day)))
+
 (defn build-updated-world
   "Builds an updated copy of the world"
   [world day]
-  (loop [edges      (slurp-csv (str "../larger_data/edge_creation/" day)) ; start with raw list of edges for the day
+  (loop [edges      (slurp-edges day) ; start with raw list of edges for the day
          new-world  world]
     (if (empty? edges)
       new-world ; return the new world with all of it's edges
@@ -163,16 +178,10 @@
   [day]
   (slurp-csv (str "../larger_data/user_counts/" day)))
 
-(defn create-walker
-  "Creates a walker without a :current-node"
-  [username transit-count]
-  {:username (keyword username) :transit-count (read-string transit-count)})
-
 (defn create-walkers
   "Returns a list of walkers for a given day."
   [day]
-  (doall
-    (map #(apply create-walker %) (slurp-user-counts day))))
+  (slurp-user-counts day))
 
 
 ;; WALKING LOGIC ---------------------------------------------------------------
@@ -199,11 +208,9 @@
 
 (defn random-walk
   "Performs the random walk"
-  [walker]
-  (let [username (:username walker)
-        total-steps (:transit-count walker)
-        first-step (get @LAST_VISITS (keyword username))]
-
+  [username raw-steps]
+  (let [total-steps (read-string raw-steps) ; bah, comes in as a string
+        first-step  (get @LAST_VISITS (keyword username))]
     (loop [history []]
       (if (= (count history) total-steps) ; we have as much history as steps
         history
@@ -212,9 +219,10 @@
           (recur (conj history (walk (last history)))))))))
 
 (defn run-and-measure-walk
-  [walker]
-  (let [history (random-walk walker)] ; this is where WORLD gets inserted
-    (set-last-visit (:username walker) (last history))
+  [walker-pair]
+  (let [[username total-steps] walker-pair
+        history (random-walk username total-steps)]
+    (set-last-visit (keyword username) (last history))
     (swap! TRANSITS + (count history)))
   true)
 
@@ -272,28 +280,28 @@
     (def iteration-start-ms (millis))
 
     ; Make world adjustments; these have to be done in sequence: world, loops, visits
-    (def update-world-start-ms (millis))
-    (update-world! day)
-    (def update-world-end-ms (millis))
+    (def update-world-ms
+      (bench
+        (update-world! day)))
 
-    (def update-loops-start-ms (millis))
-    (update-self-loop-pct! day)
-    (def update-loops-end-ms (millis))
+    (def update-loops-ms
+      (bench
+        (update-self-loop-pct! day)))
 
-    (def update-visits-start-ms (millis))
-    (update-last-visits! day)
-    (def update-visits-end-ms (millis))
+    (def update-visits-ms
+      (bench
+        (update-last-visits! day)))
 
-    (def create-walkers-start-ms (millis))
-    (def current-walkers (create-walkers day))
-    (def create-walkers-end-ms (millis))
+    (def create-walkers-ms
+      (bench
+        (def current-walkers (create-walkers day))))
 
-    (def run-walkers-start-ms (millis))
-    (dorun ; force realization
-      (pmap ; executes each of the run-batch functions in parallel
-        run-batch
-          (create-batches current-walkers)))
-    (def run-walkers-end-ms (millis))
+    (def run-walkers-ms
+      (bench
+        (dorun ; force realization
+          (pmap ; executes each of the run-batch functions in parallel
+            run-batch
+              (create-batches current-walkers)))))
 
     ; total time (in ms) for executing this iteration of the simulation
     (def iteration-elapsed (- (millis) iteration-start-ms))
@@ -305,17 +313,17 @@
     (println
       (str day ": " iteration-elapsed "ms, " (transits-per-second) " transits/sec"))
     (println
-      (str "\tUpdate world (ms): " (- update-world-end-ms update-world-start-ms)))
+      (str "\tUpdate world (ms): " update-world-ms))
     (println
-      (str "\tUpdate self loops (ms): " (- update-loops-end-ms update-loops-start-ms)))
+      (str "\tUpdate self loops (ms): " update-loops-ms))
     (println
-      (str "\tUpdate visit starts (ms): " (- update-visits-end-ms update-visits-start-ms)))
+      (str "\tUpdate visit starts (ms): " update-visits-ms))
     (println
-      (str "\tCreate walkers (ms): " (- create-walkers-end-ms create-walkers-start-ms)))
+      (str "\tCreate walkers (ms): " create-walkers-ms))
     (println
       (str "\tActive walkers: " (count current-walkers)))
     (println
-      (str "\tRun walkers (ms): " (- run-walkers-end-ms run-walkers-start-ms)))
+      (str "\tRun walkers (ms): " run-walkers-ms))
 
   ) ; END MAIN RUN LOOP
 
