@@ -1,5 +1,10 @@
 91012c
-  - ruby/run.rb
+  - 'ruby run.rb' in ruby/
   - 223k transits/sec
   - MRI Ruby 2.4.1
-  - Peat's laptop (2014 1.7GHz i7 MacBook Air)
+  - 2014 1.7GHz i7 MacBook Air
+
+f7c335
+  - 'lein run' in clojure/
+  - 611k transit/sec
+  - 2016 2.8GHz i7 MacBook Pro
