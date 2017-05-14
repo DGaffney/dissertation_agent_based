@@ -4,6 +4,7 @@
   (:gen-class))
 
 ;; TODO ------------------------------------------------------------------------
+; Write out walks, including: datestamp, username, algorithm, history ...
 ; Track how many times each node is visited for each day
 
 ;; Configuration derpage
