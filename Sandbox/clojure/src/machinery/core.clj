@@ -30,6 +30,7 @@ a long in ms."
        ~@forms
        (- (System/currentTimeMillis) start#))))
 
+
 ;; FILE READERS ----------------------------------------------------------------
 
 (defn slurp-json
@@ -57,7 +58,7 @@ a long in ms."
   []
   (let [world-src (slurp-json "../data/initial_net.json")]
 
-    ; let's ensure that all subs have the correct data structure -- {:subreddit []}
+    ; ensure that all neighbors are also top level nodes with the correct data structure -- {:subreddit []}
     (doseq [sub (distinct (flatten (vals world-src)))]
       (if (not (contains? @WORLD (keyword sub)))
         (swap! WORLD assoc (keyword sub) [ROOT_NODE])))
@@ -72,7 +73,7 @@ a long in ms."
         (swap! WORLD assoc (keyword sub) [ROOT_NODE])))))
 
 (defn ensure-node
-  "Ensures a key with a default value exists in a hashmap if it doesn't already"
+  "Ensures a node with a default value exists in a hashmap if it doesn't already"
   [m key]
   (let [kw (keyword key)] ; endure we're dealing with a keyword
     (if (contains? m kw)
@@ -112,7 +113,7 @@ a long in ms."
 
 (defn rand-self-loop-pct
   []
-  (/ (rand) 1000))
+  (/ (rand) 1000.0))
 
 (defn ensure-self-loop-pct!
   "Ensures a record exists in SELF_LOOP_PCT"
@@ -194,17 +195,12 @@ a long in ms."
     (ensure-self-loop-pct! current-node))
   (> (get @SELF_LOOP_PCT current-node) (rand)))
 
-(defn random-neighbor
-  "Selects a random neighbor"
-  [current-node]
-  (-> @WORLD current-node rand-nth))
-
 (defn walk
   "Performs a single traverse"
   [current-node]
   (if (stay-on-current-node? current-node)
     current-node
-    (random-neighbor current-node)))
+    (-> @WORLD current-node rand-nth)))
 
 (defn random-walk
   "Performs the random walk"
@@ -262,9 +258,7 @@ a long in ms."
         (recur (+ edge-count current-count) remaining-nodes)))))
 
 
-
-
-;; YOLO EXCEPT IN SIMULATIONS --------------------------------------------------
+;; YOLO ... EXCEPT IN SIMULATIONS ----------------------------------------------
 
 (defn -main
   [& args]
