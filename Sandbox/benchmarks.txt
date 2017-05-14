@@ -8,3 +8,8 @@ f7c335
   - 'lein run' in clojure/
   - 611k transit/sec
   - 2016 2.8GHz i7 MacBook Pro
+
+bdb048
+  - 'lein run' in clojure/
+  - 1.1M transit/sec
+  - 2016 2.8GHz i7 MacBook Pro
