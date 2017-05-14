@@ -90,7 +90,7 @@ a long in ms."
         (assoc new-world origin new-edges)))
 
 (defn slurp-edges
-  "Loads raw edges from disk; prefetches the next day!"
+  "Loads raw edges from disk"
   [day]
   (slurp-csv (str "../larger_data/edge_creation/" day)))
 
@@ -108,6 +108,7 @@ a long in ms."
   "Updates the world with new edges"
   [day]
   (swap! WORLD merge (build-updated-world @WORLD day)))
+
 
 ;; STATS CRUD ------------------------------------------------------------------
 
