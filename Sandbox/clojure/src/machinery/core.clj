@@ -3,6 +3,8 @@
             [clojure.data.csv :as csv])
   (:gen-class))
 
+;; TODO ------------------------------------------------------------------------
+; Track how many times each node is visited for each day
 
 ;; Configuration derpage
 
@@ -52,25 +54,6 @@ a long in ms."
 
 
 ;; WORLD CRUD ------------------------------------------------------------------
-
-(defn initialize-world!
-  "Reads in original state for the world"
-  []
-  (let [world-src (slurp-json "../data/initial_net.json")]
-
-    ; ensure that all neighbors are also top level nodes with the correct data structure -- {:subreddit []}
-    (doseq [sub (distinct (flatten (vals world-src)))]
-      (if (not (contains? @WORLD (keyword sub)))
-        (swap! WORLD assoc (keyword sub) [ROOT_NODE])))
-
-    ; ensure that all of the outbound neighbors are keywords
-    (doseq [sub (keys world-src)]
-      (swap! WORLD assoc sub (map keyword (get world-src sub))))
-
-    ; ensure that all neighbor lists can exit back to ROOT_NODE
-    (doseq [sub (keys world-src)]
-      (if (empty? (get @WORLD sub))
-        (swap! WORLD assoc (keyword sub) [ROOT_NODE])))))
 
 (defn ensure-node
   "Ensures a node with a default value exists in a hashmap if it doesn't already"
@@ -212,7 +195,7 @@ a long in ms."
       (if (= (count history) total-steps) ; we have as much history as steps
         history
         (if (empty? history)
-          (recur (conj history (walk first-step)))
+          (recur (conj history first-step))
           (recur (conj history (walk (last history)))))))))
 
 (defn run-and-measure-walk
@@ -266,8 +249,6 @@ a long in ms."
 
   ; Set up the initial state of the universe
   (reset! DAYS (initial-days))
-  (initialize-world!)
-  (reset! SELF_LOOP_PCT (initial-self-loop-pct @WORLD))
 
   ; BEGIN MAIN RUN LOOP
   (doseq [day @DAYS]
