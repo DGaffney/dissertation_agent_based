@@ -21,12 +21,13 @@
 
 (def WORLD (atom {}))
 (def SELF_LOOP_PCT (atom {}))
+(def SUBREDDIT_COUNTS (atom {}))
+(def SUBREDDIT_USER_COUNTS (atom {}))
 (def DAYS (atom []))
 (def RANDOM_WALK_ALGORITHM (atom "random-walk"))
 (def LAST_VISITS (atom {}))
 (def TRANSITS (atom 0))
 (def ELAPSED_MS (atom 0))
-
 
 ;; TIMING MACRO ----------------------------------------------------------------
 
@@ -209,11 +210,20 @@ a long in ms."
   (cond 
     (= @RANDOM_WALK_ALGORITHM "random-walk") (random-walk username total-steps)))
 
+(defn update-subreddit-counts
+  [history-frequencies]
+  (let [[subreddit subreddit-count] history-frequencies]
+    (swap! SUBREDDIT_COUNTS update-in [subreddit] (fnil (partial + subreddit-count) 0))))
+
 (defn run-and-measure-walk
   [walker-pair]
   (let [[username total-steps] walker-pair
-        history (run-random-walk username total-steps)]
+        history (run-random-walk username total-steps)
+        history-frequencies (frequencies history)]
     (set-last-visit (keyword username) (last history))
+    (pmap update-subreddit-counts history-frequencies)
+    (pmap (fn [history-frequencies] (let [[subreddit subreddit-count] history-frequencies]
+      (swap! SUBREDDIT_USER_COUNTS update-in [username subreddit] (fnil (partial + subreddit-count) 0)))) history-frequencies)
     (swap! TRANSITS + (count history))
   history))
 
