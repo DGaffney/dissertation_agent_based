@@ -191,11 +191,6 @@ a long in ms."
     current-node
     (-> @WORLD current-node rand-nth)))
 
-(defn run-random-walk
-  [username total-steps random-walk-algorithm]
-  (cond 
-    (= random-walk-algorithm "random-walk") (random-walk username total-steps)))
-
 (defn random-walk
   "Performs the random walk"
   [username raw-steps]
@@ -207,6 +202,11 @@ a long in ms."
         (if (empty? history)
           (recur (conj history first-step))
           (recur (conj history (walk (last history)))))))))
+
+(defn run-random-walk
+  [username total-steps random-walk-algorithm]
+  (cond 
+    (= random-walk-algorithm "random-walk") (random-walk username total-steps)))
 
 (defn run-and-measure-walk
   [walker-pair random-walk-algorithm]
