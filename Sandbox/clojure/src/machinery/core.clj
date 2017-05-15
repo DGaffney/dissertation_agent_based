@@ -28,7 +28,8 @@
 (def LAST_VISITS (atom {}))
 (def TRANSITS (atom 0))
 (def ELAPSED_MS (atom 0))
-
+(def SIMULATION_ID (int (* (rand) 10000000)))
+(def FILENAME (atom @RANDOM_WALK_ALGORITHM))
 ;; TIMING MACRO ----------------------------------------------------------------
 
 (defmacro bench
@@ -225,7 +226,9 @@ a long in ms."
     (pmap (fn [history-frequencies] (let [[subreddit subreddit-count] history-frequencies]
       (swap! SUBREDDIT_USER_COUNTS update-in [username subreddit] (fnil (partial + subreddit-count) 0)))) history-frequencies)
     (swap! TRANSITS + (count history))
-  history))
+  (spit @FILENAME [username history] :append true)
+  (spit @FILENAME "\n" :append true)
+  [username history]))
 
 (defn run-batch
   [walkers]
@@ -270,7 +273,7 @@ a long in ms."
   (reset! RANDOM_WALK_ALGORITHM (get (get (parse-opts args cli-options) :options) :walk))
   ; Set up the initial state of the universe
   (reset! DAYS (initial-days))
-
+  (reset! FILENAME (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) ".csv"]))
   ; BEGIN MAIN RUN LOOP
   (doseq [day (sort @DAYS)]
     ; timestamp the start of this iteration
@@ -300,7 +303,8 @@ a long in ms."
           (pmap ; executes each of the run-batch functions in parallel
             run-batch
               (create-batches current-walkers)))))
-
+    (spit @FILENAME (clojure.string/join ["==================" day "=================="]) :append true)
+    (spit @FILENAME "\n" :append true)
     ; total time (in ms) for executing this iteration of the simulation
     (def iteration-elapsed (- (millis) iteration-start-ms))
 
