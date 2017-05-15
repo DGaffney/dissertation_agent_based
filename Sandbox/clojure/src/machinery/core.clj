@@ -109,11 +109,6 @@ a long in ms."
   [day]
   (swap! WORLD merge (build-updated-world @WORLD day)))
 
-;(defn log-day
-;  "Spit the results of the day into file"
-;  [day]
-;  (log/info (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str @HISTORIES) "\n"]))
-;  (reset! HISTORIES []))
 (defn log-day
   [day]
   (info (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" @HISTORIES "\n"]))
@@ -294,7 +289,6 @@ a long in ms."
   (reset! FILENAME (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) ".log"]))
   (timbre/merge-config! {:appenders {:spit (merge (appenders/spit-appender {:fname @FILENAME}) {:async? true})}})
   (timbre/swap-config! assoc-in [:appenders :println :enabled?] false)
-  (timbre/swap-config! assoc-in [:appenders :async?] true)
   ; BEGIN MAIN RUN LOOP
   (doseq [day (sort @DAYS)]
     ; timestamp the start of this iteration
