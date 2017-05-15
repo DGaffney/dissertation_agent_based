@@ -251,8 +251,9 @@ a long in ms."
   (reset! DAYS (initial-days))
 
   ; BEGIN MAIN RUN LOOP
-  (doseq [day @DAYS]
+  (doseq [day (sort @DAYS)]
     ; timestamp the start of this iteration
+    (println day)
     (def iteration-start-ms (millis))
 
     ; Make world adjustments; these have to be done in sequence: world, loops, visits
