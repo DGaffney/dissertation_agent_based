@@ -9,13 +9,14 @@
 
 ;; Configuration derpage
 
-(def ROOT_NODE :reddit.com) ; always available from any sub
-(def BATCH_SIZE 1000) ; defines the batch size for walking
-
 (def cli-options
   ;; An option with a required argument
   [["-w" "--walk WALK-TYPE" "Type of Walk to run"
     :default "random-walk"]])
+
+(def RANDOM_WALK_ALGORITHM (get (get (parse-opts args cli-options) :options) :walk))
+(def ROOT_NODE :reddit.com) ; always available from any sub
+(def BATCH_SIZE 1000) ; defines the batch size for walking
 
 ;; STATE -----------------------------------------------------------------------
 
@@ -206,7 +207,7 @@ a long in ms."
 (defn run-random-walk
   [username total-steps random-walk-algorithm]
   (cond 
-    (= random-walk-algorithm "random-walk") (random-walk username total-steps)))
+    (= RANDOM_WALK_ALGORITHM "random-walk") (random-walk username total-steps)))
 
 (defn run-and-measure-walk
   [walker-pair random-walk-algorithm]
@@ -217,9 +218,9 @@ a long in ms."
   true)
 
 (defn run-batch
-  [walkers random-walk-algorithm]
+  [walkers]
   (doall ; force the map to execute
-    (map run-and-measure-walk walkers random-walk-algorithm)))
+    (map run-and-measure-walk walkers)))
 
 (defn create-batches
   [walkers]
@@ -256,7 +257,7 @@ a long in ms."
 
 (defn -main
   [& args]
-  (println (parse-opts args cli-options))
+
   ; Set up the initial state of the universe
   (reset! DAYS (initial-days))
 
@@ -288,7 +289,7 @@ a long in ms."
         (dorun ; force realization
           (pmap ; executes each of the run-batch functions in parallel
             run-batch
-              (create-batches current-walkers "random-walk")))))
+              (create-batches current-walkers)))))
 
     ; total time (in ms) for executing this iteration of the simulation
     (def iteration-elapsed (- (millis) iteration-start-ms))
