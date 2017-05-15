@@ -348,7 +348,7 @@ a long in ms."
     (println
       (str "\tRun walkers (ms): " run-walkers-ms))
     (println
-      (str "\tSpit results (ms): " spit-results-ms))
+      (str "\tSpit results (ms): " log-results-ms))
 
   ) ; END MAIN RUN LOOP
 
