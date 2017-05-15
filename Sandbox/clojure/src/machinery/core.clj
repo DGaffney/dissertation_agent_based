@@ -84,7 +84,7 @@ a long in ms."
 (defn slurp-edges
   "Loads raw edges from disk"
   [day]
-  (slurp-csv (str "../larger_data/edge_creation/" day)))
+  (slurp-csv (str "/media/dgaff/backup/Code/dissertation_agent_based/Sandbox/larger_data/edge_creation/" day)))
 
 (defn build-updated-world
   "Builds an updated copy of the world"
@@ -125,7 +125,7 @@ a long in ms."
 (defn update-self-loop-pct!
   "Updates stats to inform walkers"
   [day]
-  (let [self-loops (slurp-csv-kv (str "../larger_data/self_loop_percents/" day))]
+  (let [self-loops (slurp-csv-kv (str "/media/dgaff/backup/Code/dissertation_agent_based/Sandbox/larger_data/self_loop_percents/" day))]
     (doseq [[subreddit value] self-loops]
       (swap! SELF_LOOP_PCT assoc subreddit (read-string value)))))
 
@@ -145,7 +145,7 @@ a long in ms."
   []
   (map #(.getName %)
     (rest
-      (file-seq (clojure.java.io/file "../larger_data/edge_creation")))))
+      (file-seq (clojure.java.io/file "/media/dgaff/backup/Code/dissertation_agent_based/Sandbox/larger_data/edge_creation")))))
 
 
 ;; LAST VISITS CRUD ------------------------------------------------------------
@@ -164,7 +164,7 @@ a long in ms."
   "Creates {username subreddit} from file"
   [day]
   (into {}
-    (for [[username subreddit] (slurp-csv (str "../larger_data/user_starts/" day))]
+    (for [[username subreddit] (slurp-csv (str "/media/dgaff/backup/Code/dissertation_agent_based/Sandbox/larger_data/user_starts/" day))]
       [(keyword username) (keyword subreddit)])))
 
 (defn update-last-visits!
@@ -178,7 +178,7 @@ a long in ms."
 (defn slurp-user-counts
   "Creates [[username count] ...] from file"
   [day]
-  (slurp-csv (str "../larger_data/user_counts/" day)))
+  (slurp-csv (str "/media/dgaff/backup/Code/dissertation_agent_based/Sandbox/larger_data/user_counts/" day)))
 
 (defn create-walkers
   "Returns a list of walkers for a given day."
