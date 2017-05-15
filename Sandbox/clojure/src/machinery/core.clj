@@ -105,11 +105,11 @@ a long in ms."
   [day]
   (swap! WORLD merge (build-updated-world @WORLD day)))
 
-(defn log-day
-  "Spit the results of the day into file"
-  [day]
-  (log/info (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str @HISTORIES) "\n"]))
-  (reset! HISTORIES []))
+;(defn log-day
+;  "Spit the results of the day into file"
+;  [day]
+;  (log/info (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str @HISTORIES) "\n"]))
+;  (reset! HISTORIES []))
 
 ;; STATS CRUD ------------------------------------------------------------------
 
@@ -314,9 +314,9 @@ a long in ms."
             run-batch
               (create-batches current-walkers)))))
 
-    (def log-results-ms
-      (bench
-        (log-day day)))
+    ;(def log-results-ms
+    ;  (bench
+    ;    (log-day day)))
     ; total time (in ms) for executing this iteration of the simulation
     (def iteration-elapsed (- (millis) iteration-start-ms))
 
@@ -338,8 +338,8 @@ a long in ms."
       (str "\tActive walkers: " (count current-walkers)))
     (println
       (str "\tRun walkers (ms): " run-walkers-ms))
-    (println
-      (str "\tSpit results (ms): " log-results-ms))
+    ;(println
+    ;  (str "\tSpit results (ms): " log-results-ms))
 
   ) ; END MAIN RUN LOOP
 
