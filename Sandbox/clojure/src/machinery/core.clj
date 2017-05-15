@@ -2,7 +2,7 @@
   (:require [clojure.data.json :as json]
             [clojure.data.csv :as csv]
             [clojure.tools.cli :refer [parse-opts]
-            [clojure.tools.logging :as log]])
+            [taoensso.timbre :as timbre]])
   (:import (java.io BufferedWriter FileWriter))
   (:gen-class))
 
