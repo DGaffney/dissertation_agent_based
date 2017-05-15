@@ -214,8 +214,8 @@ a long in ms."
   (let [[username total-steps] walker-pair
         history (run-random-walk username total-steps)]
     (set-last-visit (keyword username) (last history))
-    (swap! TRANSITS + (count history)))
-  true)
+    (swap! TRANSITS + (count history))
+  history))
 
 (defn run-batch
   [walkers]
@@ -287,9 +287,10 @@ a long in ms."
     (def run-walkers-ms
       (bench
         (dorun ; force realization
-          (pmap ; executes each of the run-batch functions in parallel
+          (let [walk-steps (pmap ; executes each of the run-batch functions in parallel
             run-batch
-              (create-batches current-walkers)))))
+              (create-batches current-walkers))]
+            print walk-steps))))
 
     ; total time (in ms) for executing this iteration of the simulation
     (def iteration-elapsed (- (millis) iteration-start-ms))
