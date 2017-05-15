@@ -292,7 +292,9 @@ a long in ms."
   ; Set up the initial state of the universe
   (reset! DAYS (initial-days))
   (reset! FILENAME (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) ".log"]))
-  (timbre/merge-config! {:appenders {:spit (appenders/spit-appender {:fname @FILENAME})}})
+  (timbre/merge-config! {:async? true :appenders {:spit (appenders/spit-appender {:fname @FILENAME})}})
+  (timbre/swap-config! assoc-in [:appenders :println :enabled?] false)
+  (timbre/swap-config! assoc-in [:appenders :async?] true)
   ; BEGIN MAIN RUN LOOP
   (doseq [day (sort @DAYS)]
     ; timestamp the start of this iteration
