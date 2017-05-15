@@ -1,7 +1,8 @@
 (ns machinery.core
   (:require [clojure.data.json :as json]
             [clojure.data.csv :as csv]
-            [clojure.tools.cli :refer [parse-opts]])
+            [clojure.tools.cli :refer [parse-opts]
+            [clojure.tools.logging :as log]])
   (:import (java.io BufferedWriter FileWriter))
   (:gen-class))
 
@@ -107,15 +108,7 @@ a long in ms."
 (defn log-day
   "Spit the results of the day into file"
   [day]
-  (let [wtr (agent (BufferedWriter. (FileWriter. @FILENAME)))]
-      (defn log [msg]
-        (letfn [(write [out msg]
-                (.write out msg)
-                      out)]
-            (send wtr write msg)))
-        (defn close []
-              (send wtr #(.close %)))
-  (log (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str @HISTORIES) "\n"])))
+  (log/info (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str @HISTORIES) "\n"]))
   (reset! HISTORIES []))
 
 ;; STATS CRUD ------------------------------------------------------------------
