@@ -104,20 +104,19 @@ a long in ms."
   [day]
   (swap! WORLD merge (build-updated-world @WORLD day)))
 
-(let [wtr (agent (BufferedWriter. (FileWriter. @FILENAME)))]
-    (defn log [msg]
-      (letfn [(write [out msg]
-              (.write out msg)
-                    out)]
-          (send wtr write msg)))
-      (defn close []
-            (send wtr #(.close %))))
-
 (defn log-day
   "Spit the results of the day into file"
   [day]
   (def histories @HISTORIES)
-  (log (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str histories) "\n"]))
+  (let [wtr (agent (BufferedWriter. (FileWriter. @FILENAME)))]
+      (defn log [msg]
+        (letfn [(write [out msg]
+                (.write out msg)
+                      out)]
+            (send wtr write msg)))
+        (defn close []
+              (send wtr #(.close %)))
+  (log (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str histories) "\n"])))
   (reset! HISTORIES []))
 
 ;; STATS CRUD ------------------------------------------------------------------
