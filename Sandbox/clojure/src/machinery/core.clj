@@ -107,7 +107,6 @@ a long in ms."
 (defn log-day
   "Spit the results of the day into file"
   [day]
-  (def histories @HISTORIES)
   (let [wtr (agent (BufferedWriter. (FileWriter. @FILENAME)))]
       (defn log [msg]
         (letfn [(write [out msg]
@@ -116,7 +115,7 @@ a long in ms."
             (send wtr write msg)))
         (defn close []
               (send wtr #(.close %)))
-  (log (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str histories) "\n"])))
+  (log (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str @HISTORIES) "\n"])))
   (reset! HISTORIES []))
 
 ;; STATS CRUD ------------------------------------------------------------------
