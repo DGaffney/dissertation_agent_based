@@ -1,10 +1,10 @@
 (ns machinery.core
   (:require [clojure.data.json :as json]
-            [clojure.data.csv :as csv])
+            [clojure.data.csv :as csv]
+            [clojure.tools.cli :refer [parse-opts]])
   (:gen-class))
 
 ;; TODO ------------------------------------------------------------------------
-; Write out walks, including: datestamp, username, algorithm, history ...
 ; Track how many times each node is visited for each day
 
 ;; Configuration derpage
@@ -12,6 +12,10 @@
 (def ROOT_NODE :reddit.com) ; always available from any sub
 (def BATCH_SIZE 1000) ; defines the batch size for walking
 
+(def cli-options
+  ;; An option with a required argument
+  [["-w" "--walk WALK-TYPE" "Type of Walk to run"
+    :default "random-walk")
 
 ;; STATE -----------------------------------------------------------------------
 
@@ -187,6 +191,11 @@ a long in ms."
     current-node
     (-> @WORLD current-node rand-nth)))
 
+(defn run-random-walk
+  [username total-steps random-walk-algorithm]
+  (case random-walk-algorithm
+  "random-walk" (random-walk username total-steps)))
+
 (defn random-walk
   "Performs the random walk"
   [username raw-steps]
@@ -200,17 +209,17 @@ a long in ms."
           (recur (conj history (walk (last history)))))))))
 
 (defn run-and-measure-walk
-  [walker-pair]
+  [walker-pair random-walk-algorithm]
   (let [[username total-steps] walker-pair
-        history (random-walk username total-steps)]
+        history (run-random-walk username total-steps)]
     (set-last-visit (keyword username) (last history))
     (swap! TRANSITS + (count history)))
   true)
 
 (defn run-batch
-  [walkers]
+  [walkers random-walk-algorithm]
   (doall ; force the map to execute
-    (map run-and-measure-walk walkers)))
+    (map run-and-measure-walk walkers random-walk-algorithm)))
 
 (defn create-batches
   [walkers]
@@ -247,7 +256,7 @@ a long in ms."
 
 (defn -main
   [& args]
-
+  (parse-opts args cli-options)
   ; Set up the initial state of the universe
   (reset! DAYS (initial-days))
 
@@ -279,7 +288,7 @@ a long in ms."
         (dorun ; force realization
           (pmap ; executes each of the run-batch functions in parallel
             run-batch
-              (create-batches current-walkers)))))
+              (create-batches current-walkers) "random-walk"))))
 
     ; total time (in ms) for executing this iteration of the simulation
     (def iteration-elapsed (- (millis) iteration-start-ms))
