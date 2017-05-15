@@ -22,6 +22,7 @@
 (def WORLD (atom {}))
 (def SELF_LOOP_PCT (atom {}))
 (def DAYS (atom []))
+(def RANDOM_WALK_ALGORITHM "random-walk")
 (def LAST_VISITS (atom {}))
 (def TRANSITS (atom 0))
 (def ELAPSED_MS (atom 0))
@@ -256,7 +257,7 @@ a long in ms."
 
 (defn -main
   [& args]
-  (def RANDOM_WALK_ALGORITHM (get (get (parse-opts args cli-options) :options) :walk))
+  (reset! RANDOM_WALK_ALGORITHM (get (get (parse-opts args cli-options) :options) :walk))
   ; Set up the initial state of the universe
   (reset! DAYS (initial-days))
 
