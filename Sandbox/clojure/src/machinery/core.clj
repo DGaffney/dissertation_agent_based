@@ -22,7 +22,7 @@
 (def WORLD (atom {}))
 (def SELF_LOOP_PCT (atom {}))
 (def DAYS (atom []))
-(def RANDOM_WALK_ALGORITHM "random-walk")
+(def RANDOM_WALK_ALGORITHM (atom "random-walk"))
 (def LAST_VISITS (atom {}))
 (def TRANSITS (atom 0))
 (def ELAPSED_MS (atom 0))
