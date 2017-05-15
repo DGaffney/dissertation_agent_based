@@ -3,7 +3,6 @@
             [clojure.data.csv :as csv]
             [clojure.tools.cli :refer [parse-opts]
             [taoensso.timbre :as timbre]])
-  (:import (java.io BufferedWriter FileWriter))
   (:gen-class))
 
 ;; TODO ------------------------------------------------------------------------
