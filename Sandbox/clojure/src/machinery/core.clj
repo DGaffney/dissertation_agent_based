@@ -355,4 +355,6 @@ a long in ms."
   (println (str "Total Walkers: " (count @LAST_VISITS)))
   (println (str "Transits: " @TRANSITS))
   (println (str "Run time (seconds): " (quot @ELAPSED_MS 1000.0)))
+  (spit (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) "subreddit_counts.log"]) (json/write-str @SUBREDDIT_COUNTS))
+  (spit (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) "subreddit_user_counts.log"]) (json/write-str @SUBREDDIT_USER_COUNTS))
 )
