@@ -287,10 +287,10 @@ a long in ms."
     (def run-walkers-ms
       (bench
         (dorun ; force realization
-          (let [walk-steps (pmap ; executes each of the run-batch functions in parallel
+          (let [walk_steps (pmap ; executes each of the run-batch functions in parallel
             run-batch
               (create-batches current-walkers))]
-            print walk-steps))))
+            println walk-steps))))
 
     ; total time (in ms) for executing this iteration of the simulation
     (def iteration-elapsed (- (millis) iteration-start-ms))
