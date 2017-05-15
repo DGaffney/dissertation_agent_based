@@ -193,8 +193,8 @@ a long in ms."
 
 (defn run-random-walk
   [username total-steps random-walk-algorithm]
-  (case random-walk-algorithm
-  "random-walk" (random-walk username total-steps)))
+  (cond 
+    (= random-walk-algorithm "random-walk") (random-walk username total-steps)))
 
 (defn random-walk
   "Performs the random walk"
