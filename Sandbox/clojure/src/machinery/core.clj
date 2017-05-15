@@ -1,10 +1,15 @@
 (ns machinery.core
   (:require [clojure.data.json :as json]
             [clojure.data.csv :as csv]
-            [clojure.tools.cli :refer [parse-opts]
-            [taoensso.timbre :as timbre]])
+            [clojure.tools.cli :refer [parse-opts]]
+            [taoensso.timbre :as timbre
+                  :refer [log  trace  debug  info  warn  error  fatal  report
+                          logf tracef debugf infof warnf errorf fatalf reportf
+                          spy get-env]]
+            [taoensso.timbre.appenders.core :as appenders])
   (:gen-class))
 
+(timbre/refer-timbre)
 ;; TODO ------------------------------------------------------------------------
 ; Track how many times each node is visited for each day
 
@@ -109,6 +114,10 @@ a long in ms."
 ;  [day]
 ;  (log/info (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str @HISTORIES) "\n"]))
 ;  (reset! HISTORIES []))
+(defn log-day
+  [day]
+  (info (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str @HISTORIES) "\n"]))
+  (reset! HISTORIES []))
 
 ;; STATS CRUD ------------------------------------------------------------------
 
@@ -282,7 +291,8 @@ a long in ms."
   (reset! FILEPATH (get (get (parse-opts args cli-options) :options) :path))
   ; Set up the initial state of the universe
   (reset! DAYS (initial-days))
-  (reset! FILENAME (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) ".csv"]))
+  (reset! FILENAME (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) ".log"]))
+  (timbre/merge-config! {:appenders {:spit (appenders/spit-appender {:fname @FILENAME})}})
   ; BEGIN MAIN RUN LOOP
   (doseq [day (sort @DAYS)]
     ; timestamp the start of this iteration
@@ -313,9 +323,9 @@ a long in ms."
             run-batch
               (create-batches current-walkers)))))
 
-    ;(def log-results-ms
-    ;  (bench
-    ;    (log-day day)))
+    (def log-results-ms
+      (bench
+        (log-day day)))
     ; total time (in ms) for executing this iteration of the simulation
     (def iteration-elapsed (- (millis) iteration-start-ms))
 
@@ -337,8 +347,8 @@ a long in ms."
       (str "\tActive walkers: " (count current-walkers)))
     (println
       (str "\tRun walkers (ms): " run-walkers-ms))
-    ;(println
-    ;  (str "\tSpit results (ms): " log-results-ms))
+    (println
+      (str "\tSpit results (ms): " log-results-ms))
 
   ) ; END MAIN RUN LOOP
 
