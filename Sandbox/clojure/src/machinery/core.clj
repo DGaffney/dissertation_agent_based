@@ -206,6 +206,7 @@ a long in ms."
 
 (defn run-random-walk
   [username total-steps]
+  (println RANDOM_WALK_ALGORITHM)
   (cond 
     (= RANDOM_WALK_ALGORITHM "random-walk") (random-walk username total-steps)))
 
