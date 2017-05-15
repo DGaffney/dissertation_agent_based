@@ -288,7 +288,7 @@ a long in ms."
         (dorun ; force realization
           (pmap ; executes each of the run-batch functions in parallel
             run-batch
-              (create-batches current-walkers) "random-walk"))))
+              (create-batches current-walkers "random-walk")))))
 
     ; total time (in ms) for executing this iteration of the simulation
     (def iteration-elapsed (- (millis) iteration-start-ms))
