@@ -116,7 +116,7 @@ a long in ms."
 ;  (reset! HISTORIES []))
 (defn log-day
   [day]
-  (info (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str @HISTORIES) "\n"]))
+  (info (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" @HISTORIES "\n"]))
   (reset! HISTORIES []))
 
 ;; STATS CRUD ------------------------------------------------------------------
