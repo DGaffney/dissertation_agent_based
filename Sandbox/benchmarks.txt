@@ -13,3 +13,8 @@ bdb048
   - 'lein run' in clojure/
   - 1.1M transit/sec
   - 2016 2.8GHz i7 MacBook Pro
+
+f0f605
+  - 'lein run' in clojure/
+  - 1.3M transit/sec
+  - 2015 3.5GHz Xeon E5-1650
