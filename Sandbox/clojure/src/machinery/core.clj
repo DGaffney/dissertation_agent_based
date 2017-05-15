@@ -2,6 +2,7 @@
   (:require [clojure.data.json :as json]
             [clojure.data.csv :as csv]
             [clojure.tools.cli :refer [parse-opts]])
+  (:import (java.io BufferedWriter FileWriter))
   (:gen-class))
 
 ;; TODO ------------------------------------------------------------------------
@@ -12,7 +13,8 @@
 (def cli-options
   ;; An option with a required argument
   [["-w" "--walk WALK-TYPE" "Type of Walk to run"
-    :default "random-walk"]])
+    :default "random-walk"]
+    ["-p" "--path PATH" "File path for observed data" :default "../larger_data"]])
 
 (def ROOT_NODE :reddit.com) ; always available from any sub
 (def BATCH_SIZE 1000) ; defines the batch size for walking
@@ -25,6 +27,7 @@
 (def SUBREDDIT_USER_COUNTS (atom {}))
 (def DAYS (atom []))
 (def RANDOM_WALK_ALGORITHM (atom "random-walk"))
+(def FILEPATH (atom "../larger_data"))
 (def LAST_VISITS (atom {}))
 (def TRANSITS (atom 0))
 (def ELAPSED_MS (atom 0))
@@ -84,7 +87,7 @@ a long in ms."
 (defn slurp-edges
   "Loads raw edges from disk"
   [day]
-  (slurp-csv (str "/media/dgaff/backup/Code/dissertation_agent_based/Sandbox/larger_data/edge_creation/" day)))
+  (slurp-csv (str (clojure.string/join [FILEPATH "/edge_creation/"]) day)))
 
 (defn build-updated-world
   "Builds an updated copy of the world"
@@ -101,13 +104,20 @@ a long in ms."
   [day]
   (swap! WORLD merge (build-updated-world @WORLD day)))
 
-(defn spit-day
+(let [wtr (agent (BufferedWriter. (FileWriter. @FILENAME)))]
+    (defn log [msg]
+      (letfn [(write [out msg]
+              (.write out msg)
+                    out)]
+          (send wtr write msg)))
+      (defn close []
+            (send wtr #(.close %))))
+
+(defn log-day
   "Spit the results of the day into file"
   [day]
-  (spit @FILENAME (clojure.string/join ["==================" day "=================="]) :append true)
-  (spit @FILENAME "\n" :append true)
-  (spit @FILENAME @HISTORIES :append true)
-  (spit @FILENAME "\n" :append true)
+  (def histories @HISTORIES)
+  (log (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" (str histories) "\n"]))
   (reset! HISTORIES []))
 
 ;; STATS CRUD ------------------------------------------------------------------
@@ -125,7 +135,7 @@ a long in ms."
 (defn update-self-loop-pct!
   "Updates stats to inform walkers"
   [day]
-  (let [self-loops (slurp-csv-kv (str "/media/dgaff/backup/Code/dissertation_agent_based/Sandbox/larger_data/self_loop_percents/" day))]
+  (let [self-loops (slurp-csv-kv (str (clojure.string/join [FILEPATH "/self_loop_percents/"]) day))]
     (doseq [[subreddit value] self-loops]
       (swap! SELF_LOOP_PCT assoc subreddit (read-string value)))))
 
@@ -145,7 +155,7 @@ a long in ms."
   []
   (map #(.getName %)
     (rest
-      (file-seq (clojure.java.io/file "/media/dgaff/backup/Code/dissertation_agent_based/Sandbox/larger_data/edge_creation")))))
+      (file-seq (clojure.java.io/file (clojure.string/join [FILEPATH "/edge_creation/"]))))))
 
 
 ;; LAST VISITS CRUD ------------------------------------------------------------
@@ -164,7 +174,7 @@ a long in ms."
   "Creates {username subreddit} from file"
   [day]
   (into {}
-    (for [[username subreddit] (slurp-csv (str "/media/dgaff/backup/Code/dissertation_agent_based/Sandbox/larger_data/user_starts/" day))]
+    (for [[username subreddit] (slurp-csv (str (clojure.string/join [FILEPATH "/user_starts/"]) day))]
       [(keyword username) (keyword subreddit)])))
 
 (defn update-last-visits!
@@ -178,7 +188,7 @@ a long in ms."
 (defn slurp-user-counts
   "Creates [[username count] ...] from file"
   [day]
-  (slurp-csv (str "/media/dgaff/backup/Code/dissertation_agent_based/Sandbox/larger_data/user_counts/" day)))
+  (slurp-csv (str (clojure.string/join [FILEPATH "/user_counts/"]) day)))
 
 (defn create-walkers
   "Returns a list of walkers for a given day."
@@ -279,6 +289,7 @@ a long in ms."
 (defn -main
   [& args]
   (reset! RANDOM_WALK_ALGORITHM (get (get (parse-opts args cli-options) :options) :walk))
+  (reset! FILEPATH (get (get (parse-opts args cli-options) :options) :path))
   ; Set up the initial state of the universe
   (reset! DAYS (initial-days))
   (reset! FILENAME (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) ".csv"]))
@@ -312,9 +323,9 @@ a long in ms."
             run-batch
               (create-batches current-walkers)))))
 
-    (def spit-results-ms
+    (def log-results-ms
       (bench
-        (spit-day day)))
+        (log-day day)))
     ; total time (in ms) for executing this iteration of the simulation
     (def iteration-elapsed (- (millis) iteration-start-ms))
 
