@@ -290,6 +290,7 @@ a long in ms."
   [& args]
   (reset! RANDOM_WALK_ALGORITHM (get (get (parse-opts args cli-options) :options) :walk))
   (reset! FILEPATH (get (get (parse-opts args cli-options) :options) :path))
+  (println FILEPATH)
   ; Set up the initial state of the universe
   (reset! DAYS (initial-days))
   (reset! FILENAME (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) ".csv"]))
