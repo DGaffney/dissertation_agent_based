@@ -101,6 +101,14 @@ a long in ms."
   [day]
   (swap! WORLD merge (build-updated-world @WORLD day)))
 
+(defn spit-day
+  "Spit the results of the day into file"
+  [day]
+  (spit @FILENAME (clojure.string/join ["==================" day "=================="]) :append true)
+  (spit @FILENAME "\n" :append true)
+  (spit @FILENAME @HISTORIES :append true)
+  (spit @FILENAME "\n" :append true)
+  (reset! HISTORIES []))
 
 ;; STATS CRUD ------------------------------------------------------------------
 
@@ -303,11 +311,10 @@ a long in ms."
           (pmap ; executes each of the run-batch functions in parallel
             run-batch
               (create-batches current-walkers)))))
-    (spit @FILENAME (clojure.string/join ["==================" day "=================="]) :append true)
-    (spit @FILENAME "\n" :append true)
-    (spit @FILENAME @HISTORIES :append true)
-    (spit @FILENAME "\n" :append true)
-    (reset! HISTORIES [])
+
+    (def spit-results-ms
+      (bench
+        (spit-day day)))
     ; total time (in ms) for executing this iteration of the simulation
     (def iteration-elapsed (- (millis) iteration-start-ms))
 
@@ -329,6 +336,8 @@ a long in ms."
       (str "\tActive walkers: " (count current-walkers)))
     (println
       (str "\tRun walkers (ms): " run-walkers-ms))
+    (println
+      (str "\tSpit results (ms): " spit-results-ms))
 
   ) ; END MAIN RUN LOOP
 
