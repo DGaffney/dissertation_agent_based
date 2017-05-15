@@ -9,5 +9,5 @@
                  [org.clojure/tools.cli "0.3.5"]]
   :main ^:skip-aot machinery.core
   :target-path "target/%s"
-  :jvm-opts ["-Xmx8g"]
+  :jvm-opts ["-Xmx16g"]
   :profiles {:uberjar {:aot :all}})
