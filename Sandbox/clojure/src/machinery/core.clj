@@ -14,7 +14,6 @@
   [["-w" "--walk WALK-TYPE" "Type of Walk to run"
     :default "random-walk"]])
 
-(def RANDOM_WALK_ALGORITHM (get (get (parse-opts args cli-options) :options) :walk))
 (def ROOT_NODE :reddit.com) ; always available from any sub
 (def BATCH_SIZE 1000) ; defines the batch size for walking
 
@@ -257,7 +256,7 @@ a long in ms."
 
 (defn -main
   [& args]
-
+  (def RANDOM_WALK_ALGORITHM (get (get (parse-opts args cli-options) :options) :walk))
   ; Set up the initial state of the universe
   (reset! DAYS (initial-days))
 
