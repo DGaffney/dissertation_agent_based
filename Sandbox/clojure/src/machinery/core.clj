@@ -15,7 +15,7 @@
 (def cli-options
   ;; An option with a required argument
   [["-w" "--walk WALK-TYPE" "Type of Walk to run"
-    :default "random-walk")
+    :default "random-walk"]])
 
 ;; STATE -----------------------------------------------------------------------
 
