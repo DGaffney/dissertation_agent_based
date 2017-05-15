@@ -205,12 +205,12 @@ a long in ms."
           (recur (conj history (walk (last history)))))))))
 
 (defn run-random-walk
-  [username total-steps random-walk-algorithm]
+  [username total-steps]
   (cond 
     (= RANDOM_WALK_ALGORITHM "random-walk") (random-walk username total-steps)))
 
 (defn run-and-measure-walk
-  [walker-pair random-walk-algorithm]
+  [walker-pair]
   (let [[username total-steps] walker-pair
         history (run-random-walk username total-steps)]
     (set-last-visit (keyword username) (last history))
