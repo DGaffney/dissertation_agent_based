@@ -256,7 +256,7 @@ a long in ms."
 
 (defn -main
   [& args]
-  (parse-opts args cli-options)
+  (println (parse-opts args cli-options))
   ; Set up the initial state of the universe
   (reset! DAYS (initial-days))
 
