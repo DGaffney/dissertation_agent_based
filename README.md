@@ -1,4 +1,4 @@
-Grab the full dataset [here](http://yourdefaulthomepage.com/larger_dataset.zip).
+Grab the full dataset [here](http://yourdefaulthomepage.com/larger_data.zip).
 
 This provides four folders:
 
