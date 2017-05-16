@@ -21,7 +21,6 @@
     :default "random-walk"]
     ["-p" "--path PATH" "File path for observed data" :default "../larger_data"]])
 
-(def ROOT_NODE :reddit.com) ; always available from any sub
 (def BATCH_SIZE 1000) ; defines the batch size for walking
 
 ;; STATE -----------------------------------------------------------------------
@@ -75,7 +74,7 @@ a long in ms."
 (defn ensure-node
   "Ensures a node with a default value exists in a hashmap if it doesn't already"
   [m key]
-  (let [kw (keyword key)] ; endure we're dealing with a keyword
+  (let [kw key] ; endure we're dealing with a keyword
     (if (contains? m kw)
       m
       (assoc m kw []))))
@@ -203,7 +202,7 @@ a long in ms."
 (defn walk
   "Performs a single traverse"
   [current-node]
-  (if (stay-on-current-node? current-node)
+  (if (or (stay-on-current-node? current-node) (count (-> @WORLD current-node)))
     current-node
     (-> @WORLD current-node rand-nth)))
 
@@ -290,7 +289,7 @@ a long in ms."
   (timbre/merge-config! {:appenders {:spit (merge (appenders/spit-appender {:fname @FILENAME}) {:async? true})}})
   (timbre/swap-config! assoc-in [:appenders :println :enabled?] false)
   ; BEGIN MAIN RUN LOOP
-  (doseq [day (sort @DAYS)]
+  (doseq [day (take 2000 (sort @DAYS))]
     ; timestamp the start of this iteration
     (println day)
     (def iteration-start-ms (millis))
