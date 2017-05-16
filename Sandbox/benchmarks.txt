@@ -18,3 +18,9 @@ f0f605
   - 'lein run' in clojure/
   - 1.3M transit/sec
   - 2015 3.5GHz Xeon E5-1650
+
+f83654
+  - 'lein run' in clojure/
+  - 281k transit/sec with 100% more logging
+  - 2015 3.5GHz Xeon E5-1650
+
