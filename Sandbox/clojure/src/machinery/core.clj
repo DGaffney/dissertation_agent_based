@@ -78,7 +78,7 @@ a long in ms."
   (let [kw (keyword key)] ; endure we're dealing with a keyword
     (if (contains? m kw)
       m
-      (assoc m kw [ROOT_NODE]))))
+      (assoc m kw []))))
 
 (defn add-edge
   "Ensures the origin and destination nodes exists, and adds an edge"
