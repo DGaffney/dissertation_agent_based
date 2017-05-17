@@ -84,9 +84,9 @@ a long in ms."
   [world edge-pair]
   (let [[origin destination] edge-pair
         new-world            (-> world (ensure-node origin) (ensure-node destination))
-        original-edges       (get new-world origin)
-        new-edges            (set (conj original-edges destination))] ; set ensures all values are unique
-        (assoc new-world (keyword origin) new-edges)))
+        original-edges       (get new-world (keyword origin))
+        new-edges            (into [] (set (conj original-edges destination)))] ; set ensures all values are unique
+        (assoc new-world (keyword origin) (into [] (doall (map keyword new-edges))))))
 
 (defn slurp-edges
   "Loads raw edges from disk"
@@ -202,8 +202,8 @@ a long in ms."
 (defn walk
   "Performs a single traverse"
   [current-node]
-  (if (or (stay-on-current-node? current-node) (count (-> @WORLD current-node)))
-    current-node
+  (if (or (stay-on-current-node? current-node) (= 0 (count (-> @WORLD current-node))))
+    (keyword current-node)
     (-> @WORLD current-node rand-nth)))
 
 (defn random-walk
