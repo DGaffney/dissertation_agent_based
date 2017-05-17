@@ -74,7 +74,7 @@ a long in ms."
 (defn ensure-node
   "Ensures a node with a default value exists in a hashmap if it doesn't already"
   [m key]
-  (let [kw key] ; endure we're dealing with a keyword
+  (let [kw (keyword key)] ; endure we're dealing with a keyword
     (if (contains? m kw)
       m
       (assoc m kw []))))
@@ -86,7 +86,7 @@ a long in ms."
         new-world            (-> world (ensure-node origin) (ensure-node destination))
         original-edges       (get new-world origin)
         new-edges            (set (conj original-edges destination))] ; set ensures all values are unique
-        (assoc new-world origin new-edges)))
+        (assoc new-world (keyword origin) new-edges)))
 
 (defn slurp-edges
   "Loads raw edges from disk"
@@ -289,7 +289,7 @@ a long in ms."
   (timbre/merge-config! {:appenders {:spit (merge (appenders/spit-appender {:fname @FILENAME}) {:async? true})}})
   (timbre/swap-config! assoc-in [:appenders :println :enabled?] false)
   ; BEGIN MAIN RUN LOOP
-  (doseq [day (sort @DAYS)]
+  (doseq [day (take 1000 (sort @DAYS))]
     ; timestamp the start of this iteration
     (println day)
     (def iteration-start-ms (millis))
