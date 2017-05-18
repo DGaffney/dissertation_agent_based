@@ -10,5 +10,5 @@
                  [com.taoensso/timbre "4.10.0"]]
   :main ^:skip-aot machinery.core
   :target-path "target/%s"
-  :jvm-opts ["-Xmx32g"]
+  :jvm-opts ["-Xmx50g"]
   :profiles {:uberjar {:aot :all}})
