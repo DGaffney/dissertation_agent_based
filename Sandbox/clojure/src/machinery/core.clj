@@ -360,7 +360,7 @@ a long in ms."
   @SUBREDDIT_USER_COUNTS
   (def PAGE (atom 0))
   (def FILENAME_SUB_USER_COUNTS (atom (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) "subreddit_user_counts.log"])))
-  (map (fn [slice] 
+  (dorun(map (fn [slice] 
     (swap! PAGE inc)
-    (spit (clojure.string/join [@FILENAME_SUB_USER_COUNTS (str @PAGE)]) (json/write-str slice))) (partition-all 1000000 @SUBREDDIT_USER_COUNTS))
+    (spit (clojure.string/join [@FILENAME_SUB_USER_COUNTS (str @PAGE)]) (json/write-str slice))) (partition-all 1000000 @SUBREDDIT_USER_COUNTS)))
 )
