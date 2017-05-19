@@ -85,8 +85,8 @@ a long in ms."
   (let [[origin destination] edge-pair
         new-world            (-> world (ensure-node origin) (ensure-node destination))
         original-edges       (get new-world (keyword origin))
-        new-edges            (into [] (set (conj original-edges destination)))] ; set ensures all values are unique
-        (assoc new-world (keyword origin) (into [] (doall (map keyword new-edges))))))
+        new-edges            (into [] (set (conj original-edges (keyword destination))))] ; set ensures all values are unique
+        (assoc new-world (keyword origin) new-edges)))
 
 (defn slurp-edges
   "Loads raw edges from disk"
@@ -248,7 +248,7 @@ a long in ms."
 
 (defn create-batches
   [walkers]
-  (partition BATCH_SIZE BATCH_SIZE [] walkers))
+  (partition-all BATCH_SIZE BATCH_SIZE [] walkers))
 
 
 ;; UTILITY FNs -----------------------------------------------------------------
@@ -276,6 +276,8 @@ a long in ms."
             remaining-nodes (rest node-keys)]
         (recur (+ edge-count current-count) remaining-nodes)))))
 
+(defn write-subreddit-user-counts [filename page slice] 
+  (spit (clojure.string/join [filename page]) (json/write-str slice)))
 
 ;; YOLO ... EXCEPT IN SIMULATIONS ----------------------------------------------
 
@@ -355,5 +357,10 @@ a long in ms."
   (println (str "Transits: " @TRANSITS))
   (println (str "Run time (seconds): " (quot @ELAPSED_MS 1000.0)))
   (spit (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) "subreddit_counts.log"]) (json/write-str @SUBREDDIT_COUNTS))
-  (spit (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) "subreddit_user_counts.log"]) (json/write-str @SUBREDDIT_USER_COUNTS))
+  @SUBREDDIT_USER_COUNTS
+  (def PAGE (atom 0))
+  (def FILENAME_SUB_USER_COUNTS (atom (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) "subreddit_user_counts.log"])))
+  (map (fn [slice] 
+    (swap! PAGE inc)
+    (spit (clojure.string/join [@FILENAME_SUB_USER_COUNTS (str @PAGE)]) (json/write-str slice))) (partition-all 1000000 @SUBREDDIT_USER_COUNTS))
 )
