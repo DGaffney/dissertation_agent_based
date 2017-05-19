@@ -248,7 +248,7 @@ a long in ms."
 
 (defn create-batches
   [walkers]
-  (partition-all BATCH_SIZE BATCH_SIZE [] walkers))
+  (partition-all BATCH_SIZE walkers))
 
 
 ;; UTILITY FNs -----------------------------------------------------------------
