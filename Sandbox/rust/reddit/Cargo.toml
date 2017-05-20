@@ -1,0 +1,8 @@
+[package]
+name = "reddit"
+version = "0.1.0"
+authors = ["Devin Gaffney <itsme@devingaffney.com>"]
+
+[dependencies]
+csv = "0.14"
+serde_json = "1.0.2"

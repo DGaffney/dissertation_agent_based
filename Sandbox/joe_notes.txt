@@ -1,0 +1,6 @@
+1. Ramdisk size of files I'm spitting out per day .... size is 30gb so no?
+#2. Number of threads to run walkers should be ≈1.5 cores as a starting position
+3. All strings need to become symbols, symbols may need to go to integers
+4. For logging daily walks, update the global ATOM at the end of the pmapped walk
+5. Rewrite in RUST, spend rest of life writing in C
+6. Thread walks to number of total walks to process instead of number of total users per group

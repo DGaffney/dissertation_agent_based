@@ -21,7 +21,8 @@
     :default "random-walk"]
     ["-p" "--path PATH" "File path for observed data" :default "../larger_data"]])
 
-(def BATCH_SIZE 1000) ; defines the batch size for walking
+(def BATCH_SIZE 500) ; defines the batch size for walking
+(def CORE_COUNT 12) ; defines the batch size for walking
 
 ;; STATE -----------------------------------------------------------------------
 
@@ -73,20 +74,21 @@ a long in ms."
 
 (defn ensure-node
   "Ensures a node with a default value exists in a hashmap if it doesn't already"
-  [m key]
-  (let [kw (keyword key)] ; endure we're dealing with a keyword
-    (if (contains? m kw)
-      m
-      (assoc m kw []))))
+  [m kw]
+  (if (contains? m kw)
+    m
+    (assoc m kw [])))
 
 (defn add-edge
   "Ensures the origin and destination nodes exists, and adds an edge"
   [world edge-pair]
   (let [[origin destination] edge-pair
-        new-world            (-> world (ensure-node origin) (ensure-node destination))
-        original-edges       (get new-world (keyword origin))
-        new-edges            (into [] (set (conj original-edges (keyword destination))))] ; set ensures all values are unique
-        (assoc new-world (keyword origin) new-edges)))
+        k-origin             (keyword origin)
+        k-destination        (keyword destination)
+        new-world            (-> world (ensure-node k-origin) (ensure-node k-destination))
+        original-edges       (get new-world (keyword k-origin))
+        new-edges            (into [] (set (conj original-edges k-destination)))] ; set ensures all values are unique
+        (assoc new-world k-origin new-edges)))
 
 (defn slurp-edges
   "Loads raw edges from disk"
@@ -177,11 +179,19 @@ a long in ms."
 
 
 ;; WALKERS CRUD ----------------------------------------------------------------
+(defn cast-user-count-row [row]
+  (let [
+    username (first row)
+    post-count (last row)]
+  [(keyword username) (read-string post-count)]))
 
 (defn slurp-user-counts
   "Creates [[username count] ...] from file"
   [day]
-  (slurp-csv (str (clojure.string/join [@FILEPATH "/user_counts/"]) day)))
+  (let [csv-data (slurp-csv (str (clojure.string/join [@FILEPATH "/user_counts/"]) day))
+        parsed-csv-data (map cast-user-count-row csv-data)
+        walk-count (reduce + (map last parsed-csv-data))]
+  [parsed-csv-data walk-count]))
 
 (defn create-walkers
   "Returns a list of walkers for a given day."
@@ -208,9 +218,8 @@ a long in ms."
 
 (defn random-walk
   "Performs the random walk"
-  [username raw-steps]
-  (let [total-steps (read-string raw-steps) ; bah, comes in as a string
-        first-step  (get @LAST_VISITS (keyword username))]
+  [username total-steps]
+  (let [first-step  (get @LAST_VISITS (keyword username))]
     (loop [history []]
       (if (= (count history) total-steps) ; we have as much history as steps
         history
@@ -233,9 +242,10 @@ a long in ms."
   (let [[username total-steps] walker-pair
         history (run-random-walk username total-steps)
         history-frequencies (frequencies history)]
-    (set-last-visit (keyword username) (last history))
+    (set-last-visit username (last history))
     (pmap update-subreddit-counts history-frequencies)
     (pmap (fn [history-frequencies] (let [[subreddit subreddit-count] history-frequencies]
+      ;this is potentially slow unless it mutexes properly - lots of processes are writing to this global object at the same time!
       (swap! SUBREDDIT_USER_COUNTS update-in [username subreddit] (fnil (partial + subreddit-count) 0)))) history-frequencies)
     (swap! TRANSITS + (count history))
   (swap! HISTORIES conj [username history])
@@ -247,8 +257,41 @@ a long in ms."
     (map run-and-measure-walk walkers)))
 
 (defn create-batches
+  [current-walker-data]
+  (let [current-walkers (first current-walker-data)
+        walk-sum        (last current-walker-data)
+        target-count    (int (/ walk-sum (/ CORE_COUNT 0.25)))]
+    (loop [accounts (shuffle current-walkers)
+           group []
+           groups []]
+      (if (empty? accounts)
+        (conj groups group)
+        (let [acct (first accounts)
+              next-accounts (rest accounts)
+              [next-group next-groups]            
+              (if (->> group 
+                       (map last) 
+                       (apply +) 
+                       (<= target-count)) 
+                [[acct] (conj groups group)]
+                [(conj group acct) groups])]
+          (recur next-accounts next-group next-groups))))))
+
+(defn create-batches
   [walkers]
-  (partition-all BATCH_SIZE walkers))
+  (let [walkers (first walkers)]
+  (partition-all BATCH_SIZE walkers)))
+; (defn create-batches
+;   [walker-data]
+;   (let [walkers  (first walker-data)
+;         walk-sum (last walker-data)
+;         current-count 0
+;         target-count (int (/ walk-sum CORE_COUNT))
+;         current-batch []
+;         batches []]
+; ))
+;
+;   (partition-all BATCH_SIZE walkers))
 
 
 ;; UTILITY FNs -----------------------------------------------------------------
@@ -341,7 +384,7 @@ a long in ms."
     (println
       (str "\tCreate walkers (ms): " create-walkers-ms))
     (println
-      (str "\tActive walkers: " (count current-walkers)))
+      (str "\tActive walkers: " (count (first current-walkers))))
     (println
       (str "\tRun walkers (ms): " run-walkers-ms))
     (println
@@ -364,3 +407,4 @@ a long in ms."
     (swap! PAGE inc)
     (spit (clojure.string/join [@FILENAME_SUB_USER_COUNTS (str @PAGE)]) (json/write-str slice))) (partition-all 1000000 @SUBREDDIT_USER_COUNTS)))
 )
+(-main)
