@@ -93,6 +93,13 @@ a long in ms."
   [day]
   (slurp-csv (str (clojure.string/join [@FILEPATH "/edge_creation/"]) day)))
 
+(defn keywordize-edges [key edges]
+    (map keyword edges))
+
+(defn slurp-edges-map
+  [day]
+  (json/read-str (slurp (str (clojure.string/join [@FILEPATH "/daily_nets/"]) day)) :key-fn keyword :value-fn keywordize-edges))
+
 (defn new-nodes
   [edges]
   (into [] (clojure.set/difference (set (map (fn[e] (keyword (first e))) edges)) (set (keys @WORLD)))))
@@ -101,7 +108,8 @@ a long in ms."
   "Builds an updated copy of the world"
   [world day]
   (loop [edges      (slurp-edges day) ; start with raw list of edges for the day
-         new-world (merge world (zipmap (new-nodes edges) (repeat [])))]
+         edge-map (slurp-edges-map day)
+         new-world (merge world (zipmap (new-nodes (keys edge-map)) (repeat [])))]
     (if (empty? edges)
       new-world ; return the new world with all of it's edges
       (recur (rest edges)
@@ -115,6 +123,14 @@ a long in ms."
   "Updates the world with new edges"
   [day]
   (swap! WORLD merge (build-updated-world @WORLD day)))
+  
+(defn net-to-symbols
+  [net]
+  (map (fn[subreddit edges])))
+
+(defn update-world!
+  [day]
+  (swap! WORLD (slurp-edges-map day)))
 
 (defn log-day
   [day]
