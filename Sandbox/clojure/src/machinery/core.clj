@@ -97,13 +97,6 @@ a long in ms."
   [edges]
   (into [] (clojure.set/difference (set (map (fn[e] (keyword (first e))) edges)) (set (keys @WORLD)))))
 
-(defn update-nodes
-  [new-world new-subs]
-  (loop []
-   (if (empty? new-subs)
-     new-world ; return the new world with all of it's edges
-     (recur (rest new-subs) ((ensure-node new-world (first new-subs)))))))
-
 (defn build-updated-world
   "Builds an updated copy of the world"
   [world day]
