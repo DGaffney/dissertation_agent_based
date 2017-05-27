@@ -1,6 +1,7 @@
 (ns machinery.core
   (:require [clojure.data.json :as json]
             [clojure.data.csv :as csv]
+            [clojure.java.io :as io]
             [clojure.tools.cli :refer [parse-opts]]
             [taoensso.timbre :as timbre
                   :refer [log  trace  debug  info  warn  error  fatal  report
@@ -21,24 +22,24 @@
     :default "random-walk"]
     ["-p" "--path PATH" "File path for observed data" :default "../larger_data"]])
 
-(def BATCH_SIZE 5000) ; defines the batch size for walking
-(def CORE_COUNT 12) ; defines the batch size for walking
+(def BATCH_SIZE 50) ; defines the batch size for walking
+(def CORE_COUNT 12) ; number of CPU cores
 
 ;; STATE -----------------------------------------------------------------------
-
+(def FUCKUPS (atom 0))
 (def WORLD (atom {}))
-(def SELF_LOOP_PCT (atom {}))
-(def SUBREDDIT_COUNTS (atom {}))
-(def SUBREDDIT_USER_COUNTS (atom {}))
+(def SELF_LOOP_PCT (ref {}))
+(def SUBREDDIT_COUNTS (ref {}))
+(def SUBREDDIT_USER_COUNTS (ref {}))
 (def DAYS (atom []))
 (def RANDOM_WALK_ALGORITHM (atom "random-walk"))
 (def FILEPATH (atom "../larger_data"))
 (def LAST_VISITS (atom {}))
-(def TRANSITS (atom 0))
+(def TRANSITS (ref 0))
 (def ELAPSED_MS (atom 0))
 (def SIMULATION_ID (int (* (rand) 10000000)))
 (def FILENAME (atom @RANDOM_WALK_ALGORITHM))
-(def HISTORIES (atom []))
+(def HISTORIES (ref []))
 
 ;; TIMING MACRO ----------------------------------------------------------------
 
@@ -94,67 +95,85 @@ a long in ms."
   (slurp-csv (str (clojure.string/join [@FILEPATH "/edge_creation/"]) day)))
 
 (defn keywordize-edges [key edges]
-    (map keyword edges))
+    (mapv keyword edges))
 
 (defn slurp-edges-map
   [day]
-  (json/read-str (slurp (str (clojure.string/join [@FILEPATH "/daily_nets/"]) day)) :key-fn keyword :value-fn keywordize-edges))
+  (json/read-str (slurp (str (clojure.string/join [@FILEPATH "/cumulative_daily_nets_new3/"]) day)) :key-fn keyword :value-fn keywordize-edges))
 
 (defn new-nodes
   [edges]
   (into [] (clojure.set/difference (set (map (fn[e] (keyword (first e))) edges)) (set (keys @WORLD)))))
 
-(defn build-updated-world
-  "Builds an updated copy of the world"
-  [world day]
-  (loop [edges      (slurp-edges day) ; start with raw list of edges for the day
-         edge-map (slurp-edges-map day)
-         new-world (merge world (zipmap (new-nodes (keys edge-map)) (repeat [])))]
-    (if (empty? edges)
-      new-world ; return the new world with all of it's edges
-      (recur (rest edges)
-             (add-edge new-world (first edges))))))
+;(defn build-updated-world
+;  "Builds an updated copy of the world"
+ ; [world day]
+ ; (loop [edges      (slurp-edges day) ; start with raw list of edges for the day
+;         edge-map (slurp-edges-map day)
+;         new-world (merge world (zipmap (new-nodes (keys edge-map)) (repeat [])))]
+;    (if (empty? edges)
+;      new-world ; return the new world with all of it's edges
+;      (recur (rest edges)
+;             (add-edge new-world (first edges))))))
 
 (defn read-world
   [day]
   (json/read-str (slurp (str (clojure.string/join [@FILEPATH "/worlds/"]) day))))
 
-(defn update-world!
-  "Updates the world with new edges"
-  [day]
-  (swap! WORLD merge (build-updated-world @WORLD day)))
+;(defn update-world!
+;  "Updates the world with new edges"
+;  [day]
+;  (swap! WORLD merge (build-updated-world @WORLD day)))
   
-(defn net-to-symbols
-  [net]
-  (map (fn[subreddit edges])))
-
 (defn update-world!
   [day]
-  (swap! WORLD (slurp-edges-map day)))
+  (swap! WORLD #(merge-with concat % (slurp-edges-map day))))
 
+
+;(defn agent-write [w content]
+;  (doto w
+;    (.write w content)
+;    (.write "\n")
+;    .flush))
+
+;(defn log-agent [day] (agent (io/writer (daily-log-file day) :append true)))
+;(defn log-file [day] (agent (io/writer (daily-log-file day))))
+
+;(defn daily-log-folder-path [day]
+;  (clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM "daily_results"]))
+
+;(defn daily-log-file [day]
+;  (clojure.string/join "/" [(daily-log-folder-path day) day]))
+
+;(defn log-day
+;  [day]
+;  (let [folder_path (clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM "daily_results"])
+;  history-snap @HISTORIES]
+;  (io/make-parents (daily-log-file day))
+;  (send (log-agent day) agent-write history-snap)
+;  (def HISTORIES (ref []))))
 (defn log-day
   [day]
   (info (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" @HISTORIES "\n"]))
-  (reset! HISTORIES []))
+  (def HISTORIES (ref [])))
 
 ;; STATS CRUD ------------------------------------------------------------------
 
 (defn rand-self-loop-pct
   []
-  (/ (rand) 1000.0))
+  (rand))
 
 (defn ensure-self-loop-pct!
   "Ensures a record exists in SELF_LOOP_PCT"
   [key]
-  (if-not (contains? @SELF_LOOP_PCT key)
-    (swap! SELF_LOOP_PCT assoc key (rand-self-loop-pct))))
+  (dosync (alter SELF_LOOP_PCT assoc key (rand-self-loop-pct))))
 
 (defn update-self-loop-pct!
   "Updates stats to inform walkers"
   [day]
-  (let [self-loops (slurp-csv-kv (str (clojure.string/join [@FILEPATH "/self_loop_percents/"]) day))]
+  (let [self-loops (slurp-csv-kv (str (clojure.string/join [@FILEPATH "/accumulated_self_loops/"]) day))]
     (doseq [[subreddit value] self-loops]
-      (swap! SELF_LOOP_PCT assoc subreddit (read-string value)))))
+      (dosync (alter SELF_LOOP_PCT assoc subreddit (read-string value))))))
 
 (defn initial-self-loop-pct
   "Creates the initial stats data"
@@ -236,7 +255,8 @@ a long in ms."
   [current-node]
   (if (or (stay-on-current-node? current-node) (= 0 (count (-> @WORLD current-node))))
     (keyword current-node)
-    (-> @WORLD current-node rand-nth)))
+    (let [step (-> @WORLD current-node rand-nth)]
+      (if (= nil step) current-node step))))
 
 (defn random-walk
   "Performs the random walk"
@@ -254,23 +274,43 @@ a long in ms."
   (cond 
     (= @RANDOM_WALK_ALGORITHM "random-walk") (random-walk username total-steps)))
 
-(defn update-subreddit-counts
-  [history-frequencies]
-  (let [[subreddit subreddit-count] history-frequencies]
-    (swap! SUBREDDIT_COUNTS update-in [subreddit] (fnil (partial + subreddit-count) 0))))
-
 (defn run-and-measure-walk
   [walker-pair]
   (let [[username total-steps] walker-pair
         history (run-random-walk username total-steps)
         history-frequencies (frequencies history)]
     (set-last-visit (keyword username) (last history))
-    (pmap update-subreddit-counts history-frequencies)
-    (pmap (fn [history-frequencies] (let [[subreddit subreddit-count] history-frequencies]
+;    (pmap update-subreddit-counts history-frequencies)
+    (map (fn [history-frequencies] (let [[subreddit subreddit-count] history-frequencies]
       (swap! SUBREDDIT_USER_COUNTS update-in [username subreddit] (fnil (partial + subreddit-count) 0)))) history-frequencies)
-    (swap! TRANSITS + (count history))
-  (swap! HISTORIES conj [username history])
+;    (swap! TRANSITS + (count history))
+;  (swap! HISTORIES conj [username history])
   [username history]))
+
+(defn update-subreddit-counts
+  [subreddit-counts]
+  (map (fn [subreddit-count] 
+    (dosync (commute SUBREDDIT_COUNTS update-in [(first subreddit-count)] (fnil (partial + (last subreddit-count)) 0)))) subreddit-counts))
+  
+(defn update-subreddit-user-counts
+  [subreddit-user-counts]
+  (map (fn [subreddit-user-count]
+    (map (fn [history-frequency] (let [[subreddit subreddit-count] history-frequency]
+      (dosync (commute SUBREDDIT_COUNTS update-in [(first subreddit-user-count) subreddit] (fnil (partial + subreddit-count) 0))))) (into [] (last subreddit-user-count)))) subreddit-user-counts))
+
+(defn update-stats
+  [walker-results]
+  (let [transposed-results (apply map list walker-results)
+        history-set (nth transposed-results 0)
+        subreddit-count-set (nth transposed-results 1)
+        subreddit-counts (apply merge-with + subreddit-count-set)
+        subreddit-user-count-set (nth transposed-results 2)
+        subreddit-user-counts (apply merge-with + subreddit-user-count-set)
+        transit-set (nth transposed-results 3)]
+    (dosync (alter HISTORIES conj history-set))
+    (update-subreddit-counts subreddit-counts)
+    ;(update-subreddit-user-counts subreddit-user-counts)
+    (dosync (alter TRANSITS + (reduce + transit-set)))))
 
 ;(defn run-batch
 ;  [walkers]
@@ -288,10 +328,6 @@ a long in ms."
 ;        (swap! SUBREDDIT_USER_COUNTS update-in [username subreddit] (fnil (partial + (get history-freq subreddit)) 0))) (keys history-freq))
 ;      )) post-histories)))  
 ;(reduce + (flatten (map vals (vals @SUBREDDIT_USER_COUNTS))))
-(defn run-batch
-  [walkers]
-  (doall ; force the map to execute
-    (map run-and-measure-walk walkers)))
 
 (defn create-batches
   [current-walker-data]
@@ -314,10 +350,18 @@ a long in ms."
                 [(conj group acct) groups])]
           (recur next-accounts next-group next-groups))))))
 
+(defn determine-batch-size 
+  [walker-count]
+  (let [batch-count (int (/ walker-count BATCH_SIZE))]
+  (if (= batch-count 0)
+    1
+    batch-count)))
+
 (defn create-batches
   [walkers]
   (let [walkers (first walkers)]
-  (partition-all BATCH_SIZE walkers)))
+  (partition-all (determine-batch-size (count walkers)) walkers)))
+
 ; (defn create-batches
 ;   [walker-data]
 ;   (let [walkers  (first walker-data)
@@ -329,6 +373,14 @@ a long in ms."
 ; ))
 ;
 ;   (partition-all BATCH_SIZE walkers))
+(defn run-batch
+  [walkers]
+  (let [histories (doall (map run-and-measure-walk walkers))
+        subreddit-counts (frequencies (flatten (map last histories)))
+        subreddit-user-counts (into {} (map (fn [pair] [(first pair) (frequencies (last pair))]) histories))
+        transits (reduce + (vals subreddit-counts))]
+    [histories subreddit-counts subreddit-user-counts transits]))
+
 
 
 ;; UTILITY FNs -----------------------------------------------------------------
@@ -371,11 +423,9 @@ a long in ms."
   (timbre/merge-config! {:appenders {:spit (merge (appenders/spit-appender {:fname @FILENAME}) {:async? true})}})
   (timbre/swap-config! assoc-in [:appenders :println :enabled?] false)
   ; BEGIN MAIN RUN LOOP
-  (doseq [day (sort @DAYS)]
+  (doseq [day (take 500 (sort @DAYS))]
     ; timestamp the start of this iteration
-    (println day)
     (def iteration-start-ms (millis))
-
     ; Make world adjustments; these have to be done in sequence: world, loops, visits
     (def update-world-ms
       (bench
@@ -395,10 +445,14 @@ a long in ms."
 
     (def run-walkers-ms
       (bench
-        (dorun ; force realization
+        (def walker-results (doall ; force realization
           (pmap ; executes each of the run-batch functions in parallel
             run-batch
-              (create-batches current-walkers)))))
+              (create-batches current-walkers))))))
+
+    (def update-stats-ms
+      (bench 
+        (update-stats walker-results)))
 
     (def log-results-ms
       (bench
@@ -410,6 +464,9 @@ a long in ms."
     (swap! ELAPSED_MS + iteration-elapsed)
 
     ; status strings
+    (println (str "World size: " (count @WORLD)))
+    (println (str "Transits: " ))
+    (println (str (format "%.2f" (* (float (/ @TRANSITS 2105157298)) 100)) "% complete"))
     (println
       (str day ": " iteration-elapsed "ms, " (transits-per-second) " transits/sec"))
     (println
@@ -424,6 +481,8 @@ a long in ms."
       (str "\tActive walkers: " (count (first current-walkers))))
     (println
       (str "\tRun walkers (ms): " run-walkers-ms))
+      (println
+        (str "\tUpdate Stats (ms): " update-stats-ms))
     (println
       (str "\tSpit results (ms): " log-results-ms))
 
@@ -443,4 +502,3 @@ a long in ms."
     (swap! PAGE inc)
     (spit (clojure.string/join [@FILENAME_SUB_USER_COUNTS (str @PAGE)]) (json/write-str slice))) (partition-all 1000000 @SUBREDDIT_USER_COUNTS)))
 )
-(-main)
