@@ -31,15 +31,19 @@
 (def SELF_LOOP_PCT (ref {}))
 (def SUBREDDIT_COUNTS (ref {}))
 (def SUBREDDIT_USER_COUNTS (ref {}))
+(def s-u-c (ref {}))
+(def s-l-s-u-c (ref {}))
+(def n-s-l-s-u-c (ref {}))
 (def DAYS (atom []))
 (def RANDOM_WALK_ALGORITHM (atom "random-walk"))
 (def FILEPATH (atom "../larger_data"))
 (def LAST_VISITS (atom {}))
+(def LAST_VISIT_SELF_LOOP (atom {}))
 (def TRANSITS (ref 0))
 (def ELAPSED_MS (atom 0))
 (def SIMULATION_ID (int (* (rand) 10000000)))
 (def FILENAME (atom @RANDOM_WALK_ALGORITHM))
-(def HISTORIES (ref []))
+;(def HISTORIES (ref []))
 
 ;; TIMING MACRO ----------------------------------------------------------------
 
@@ -105,57 +109,19 @@ a long in ms."
   [edges]
   (into [] (clojure.set/difference (set (map (fn[e] (keyword (first e))) edges)) (set (keys @WORLD)))))
 
-;(defn build-updated-world
-;  "Builds an updated copy of the world"
- ; [world day]
- ; (loop [edges      (slurp-edges day) ; start with raw list of edges for the day
-;         edge-map (slurp-edges-map day)
-;         new-world (merge world (zipmap (new-nodes (keys edge-map)) (repeat [])))]
-;    (if (empty? edges)
-;      new-world ; return the new world with all of it's edges
-;      (recur (rest edges)
-;             (add-edge new-world (first edges))))))
-
 (defn read-world
   [day]
   (json/read-str (slurp (str (clojure.string/join [@FILEPATH "/worlds/"]) day))))
 
-;(defn update-world!
-;  "Updates the world with new edges"
-;  [day]
-;  (swap! WORLD merge (build-updated-world @WORLD day)))
-  
 (defn update-world!
   [day]
-  (swap! WORLD #(merge-with concat % (slurp-edges-map day))))
+  (swap! WORLD #(merge-with into % (slurp-edges-map day))))
 
-
-;(defn agent-write [w content]
-;  (doto w
-;    (.write w content)
-;    (.write "\n")
-;    .flush))
-
-;(defn log-agent [day] (agent (io/writer (daily-log-file day) :append true)))
-;(defn log-file [day] (agent (io/writer (daily-log-file day))))
-
-;(defn daily-log-folder-path [day]
-;  (clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM "daily_results"]))
-
-;(defn daily-log-file [day]
-;  (clojure.string/join "/" [(daily-log-folder-path day) day]))
-
-;(defn log-day
-;  [day]
-;  (let [folder_path (clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM "daily_results"])
-;  history-snap @HISTORIES]
-;  (io/make-parents (daily-log-file day))
-;  (send (log-agent day) agent-write history-snap)
-;  (def HISTORIES (ref []))))
 (defn log-day
   [day]
-  (info (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" @HISTORIES "\n"]))
-  (def HISTORIES (ref [])))
+;  (info (clojure.string/join [(clojure.string/join ["==================" day "=================="]) "\n" @HISTORIES "\n"]))
+;  (def HISTORIES (ref []))
+  )
 
 ;; STATS CRUD ------------------------------------------------------------------
 
@@ -198,8 +164,9 @@ a long in ms."
 
 (defn set-last-visit
   "Sets the last known visit for a given user"
-  [username subreddit]
-  (swap! LAST_VISITS assoc (keyword username) (keyword subreddit)))
+  [username subreddit self-loop]
+  (swap! LAST_VISITS assoc (keyword username) (keyword subreddit))
+  (swap! LAST_VISIT_SELF_LOOP assoc (keyword username) self-loop))
 
 (defn get-last-visit
   "Gets the last known visit for a given user"
@@ -216,7 +183,9 @@ a long in ms."
 (defn update-last-visits!
   "Uses the user starting data to seed LAST_VISITS"
   [day]
-  (swap! LAST_VISITS merge (slurp-user-starts day)))
+  (let [user-starts (slurp-user-starts day)]
+  (swap! LAST_VISITS merge user-starts)
+  (swap! LAST_VISIT_SELF_LOOP merge (apply hash-map (flatten (map (fn[user] [user false])(keys user-starts)))))))
 
 
 ;; WALKERS CRUD ----------------------------------------------------------------
@@ -230,7 +199,7 @@ a long in ms."
   "Creates [[username count] ...] from file"
   [day]
   (let [csv-data (slurp-csv (str (clojure.string/join [@FILEPATH "/user_counts/"]) day))
-        parsed-csv-data (map cast-user-count-row csv-data)
+        parsed-csv-data (mapv cast-user-count-row csv-data)
         walk-count (reduce + (map last parsed-csv-data))]
   [parsed-csv-data walk-count]))
 
@@ -254,20 +223,21 @@ a long in ms."
   "Performs a single traverse"
   [current-node]
   (if (or (stay-on-current-node? current-node) (= 0 (count (-> @WORLD current-node))))
-    (keyword current-node)
+    [current-node false]
     (let [step (-> @WORLD current-node rand-nth)]
-      (if (= nil step) current-node step))))
+      (if (= nil step) [(rand-nth (keys @WORLD)) true] [step true]))))
 
 (defn random-walk
   "Performs the random walk"
   [username total-steps]
-  (let [first-step  (get @LAST_VISITS (keyword username))]
+  (let [first-step  (get @LAST_VISITS username)
+        first-step-self-loop  (get @LAST_VISIT_SELF_LOOP username)]
     (loop [history []]
       (if (= (count history) total-steps) ; we have as much history as steps
         history
         (if (empty? history)
-          (recur (conj history first-step))
-          (recur (conj history (walk (last history)))))))))
+          (recur (conj history [first-step first-step-self-loop]))
+          (recur (conj history (walk (first (last history))))))))))
 
 (defn run-random-walk
   [username total-steps]
@@ -277,26 +247,25 @@ a long in ms."
 (defn run-and-measure-walk
   [walker-pair]
   (let [[username total-steps] walker-pair
-        history (run-random-walk username total-steps)
-        history-frequencies (frequencies history)]
-    (set-last-visit (keyword username) (last history))
-;    (pmap update-subreddit-counts history-frequencies)
-    (map (fn [history-frequencies] (let [[subreddit subreddit-count] history-frequencies]
-      (swap! SUBREDDIT_USER_COUNTS update-in [username subreddit] (fnil (partial + subreddit-count) 0)))) history-frequencies)
-;    (swap! TRANSITS + (count history))
-;  (swap! HISTORIES conj [username history])
+        history (run-random-walk username total-steps)]
+    (set-last-visit (keyword username) (first (last history)) (last (last history)))
   [username history]))
 
 (defn update-subreddit-counts
   [subreddit-counts]
-  (map (fn [subreddit-count] 
-    (dosync (commute SUBREDDIT_COUNTS update-in [(first subreddit-count)] (fnil (partial + (last subreddit-count)) 0)))) subreddit-counts))
+  (doall (map (fn [subreddit-count] 
+    (dosync (alter SUBREDDIT_COUNTS update-in [(first subreddit-count)] (fnil (partial + (last subreddit-count)) 0)))) subreddit-counts)))
   
 (defn update-subreddit-user-counts
-  [subreddit-user-counts]
-  (map (fn [subreddit-user-count]
-    (map (fn [history-frequency] (let [[subreddit subreddit-count] history-frequency]
-      (dosync (commute SUBREDDIT_COUNTS update-in [(first subreddit-user-count) subreddit] (fnil (partial + subreddit-count) 0))))) (into [] (last subreddit-user-count)))) subreddit-user-counts))
+  [subreddit-user-counts self-loop-subreddit-user-counts non-self-loop-subreddit-user-counts]
+  (let [
+;    updated-counts (merge-with (fn [a b] (merge-with + a b)) @s-u-c subreddit-user-counts)
+    self-loop-updated-counts (merge-with (fn [a b] (merge-with + a b)) @s-l-s-u-c self-loop-subreddit-user-counts)
+    non-self-loop-updated-counts (merge-with (fn [a b] (merge-with + a b)) @n-s-l-s-u-c non-self-loop-subreddit-user-counts)
+    ]
+;  (dosync (ref-set s-u-c updated-counts))
+  (dosync (ref-set s-l-s-u-c self-loop-updated-counts))
+  (dosync (ref-set n-s-l-s-u-c non-self-loop-updated-counts))))
 
 (defn update-stats
   [walker-results]
@@ -304,30 +273,18 @@ a long in ms."
         history-set (nth transposed-results 0)
         subreddit-count-set (nth transposed-results 1)
         subreddit-counts (apply merge-with + subreddit-count-set)
-        subreddit-user-count-set (nth transposed-results 2)
-        subreddit-user-counts (apply merge-with + subreddit-user-count-set)
-        transit-set (nth transposed-results 3)]
-    (dosync (alter HISTORIES conj history-set))
+        ; subreddit-user-count-set (nth transposed-results 2)
+        ; subreddit-user-counts (apply merge-with + subreddit-user-count-set)
+        transit-set (nth transposed-results 3)
+        ; self-loop-subreddit-user-count-set (nth transposed-results 4)
+        ; self-loop-subreddit-user-counts (apply merge-with + self-loop-subreddit-user-count-set)
+        ; non-self-loop-subreddit-user-count-set (nth transposed-results 5)
+        ; non-self-loop-subreddit-user-counts (apply merge-with + non-self-loop-subreddit-user-count-set)
+        ]
+;    (dosync (alter HISTORIES conj history-set))
     (update-subreddit-counts subreddit-counts)
-    ;(update-subreddit-user-counts subreddit-user-counts)
+    ; (update-subreddit-user-counts subreddit-user-counts self-loop-subreddit-user-counts non-self-loop-subreddit-user-counts)
     (dosync (alter TRANSITS + (reduce + transit-set)))))
-
-;(defn run-batch
-;  [walkers]
-;  (let [post-histories (doall (map run-and-measure-walk walkers))
-;        subreddit-counts (frequencies (flatten (map last post-histories)))
-;        transit-count (reduce + (vals subreddit-counts))]
-;    (swap! TRANSITS + transit-count)
-;    (pmap (fn [subreddit-count-pair] (let [[subreddit subreddit-count] subreddit-count-pair] 
-;      (swap! SUBREDDIT_COUNTS update-in [subreddit] (fnil (partial + subreddit-count) 0)))) subreddit-counts)
-;    (pmap (fn [user-history] 
-;      (let [[username history] user-history
-;            history-freq (frequencies history)] 
-;      (swap! HISTORIES conj [username history])
-;      (pmap (fn [subreddit] 
-;        (swap! SUBREDDIT_USER_COUNTS update-in [username subreddit] (fnil (partial + (get history-freq subreddit)) 0))) (keys history-freq))
-;      )) post-histories)))  
-;(reduce + (flatten (map vals (vals @SUBREDDIT_USER_COUNTS))))
 
 (defn create-batches
   [current-walker-data]
@@ -362,24 +319,29 @@ a long in ms."
   (let [walkers (first walkers)]
   (partition-all (determine-batch-size (count walkers)) walkers)))
 
-; (defn create-batches
-;   [walker-data]
-;   (let [walkers  (first walker-data)
-;         walk-sum (last walker-data)
-;         current-count 0
-;         target-count (int (/ walk-sum CORE_COUNT))
-;         current-batch []
-;         batches []]
-; ))
-;
-;   (partition-all BATCH_SIZE walkers))
+(defn filter-subreddit-user-counts
+  [histories select-self-loops]
+  (into {} 
+    (filter 
+      (fn[user-pair] (> (count (last user-pair)) 0)) 
+      (map (fn [pair] [(first pair) (frequencies 
+        (map first 
+          (filter 
+            (fn[p] (= select-self-loops (last p))) 
+            (last pair))))]) 
+  histories))))
+  
+
 (defn run-batch
   [walkers]
   (let [histories (doall (map run-and-measure-walk walkers))
-        subreddit-counts (frequencies (flatten (map last histories)))
-        subreddit-user-counts (into {} (map (fn [pair] [(first pair) (frequencies (last pair))]) histories))
+        sub-histories (map (fn[history] [(first history) (map first (last history))]) histories)
+        subreddit-counts (frequencies (flatten (map last sub-histories)))
+        subreddit-user-counts (into {} (map (fn [pair] [(first pair) (frequencies (last pair))]) sub-histories))
+        self-loop-subreddit-user-counts (filter-subreddit-user-counts histories false)
+        non-self-loop-subreddit-user-counts (filter-subreddit-user-counts histories true)
         transits (reduce + (vals subreddit-counts))]
-    [histories subreddit-counts subreddit-user-counts transits]))
+    [histories subreddit-counts subreddit-user-counts transits self-loop-subreddit-user-counts non-self-loop-subreddit-user-counts]))
 
 
 
@@ -423,7 +385,7 @@ a long in ms."
   (timbre/merge-config! {:appenders {:spit (merge (appenders/spit-appender {:fname @FILENAME}) {:async? true})}})
   (timbre/swap-config! assoc-in [:appenders :println :enabled?] false)
   ; BEGIN MAIN RUN LOOP
-  (doseq [day (take 500 (sort @DAYS))]
+  (doseq [day (sort @DAYS)]
     ; timestamp the start of this iteration
     (def iteration-start-ms (millis))
     ; Make world adjustments; these have to be done in sequence: world, loops, visits
@@ -498,7 +460,18 @@ a long in ms."
   (spit (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) "subreddit_counts.log"]) (json/write-str @SUBREDDIT_COUNTS))
   (def PAGE (atom 0))
   (def FILENAME_SUB_USER_COUNTS (atom (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) "subreddit_user_counts.log"])))
+  (def FILENAME_SL_SUB_USER_COUNTS (atom (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) "self_loop_subreddit_user_counts.log"])))
+  (def FILENAME_NSL_SUB_USER_COUNTS (atom (clojure.string/join [(clojure.string/join "_" [(str SIMULATION_ID) @RANDOM_WALK_ALGORITHM]) "non_self_loop_subreddit_user_counts.log"])))
   (dorun(map (fn [slice] 
     (swap! PAGE inc)
-    (spit (clojure.string/join [@FILENAME_SUB_USER_COUNTS (str @PAGE)]) (json/write-str slice))) (partition-all 1000000 @SUBREDDIT_USER_COUNTS)))
+    (spit (clojure.string/join [@FILENAME_SUB_USER_COUNTS (str @PAGE)]) (json/write-str slice))) (partition-all 1000000 @s-u-c)))
+  (def PAGE (atom 0))
+  (dorun(map (fn [slice] 
+    (swap! PAGE inc)
+    (spit (clojure.string/join [@FILENAME_SL_SUB_USER_COUNTS (str @PAGE)]) (json/write-str slice))) (partition-all 1000000 @s-l-s-u-c)))
+  (def PAGE (atom 0))
+  (dorun(map (fn [slice] 
+    (swap! PAGE inc)
+    (spit (clojure.string/join [@FILENAME_NSL_SUB_USER_COUNTS (str @PAGE)]) (json/write-str slice))) (partition-all 1000000 @n-s-l-s-u-c)))
 )
+;(-main)
