@@ -1,0 +1,19 @@
+SBT 0.11.0 is added in this project
+
+try everything by running
+./script/sbt.sh update test
+
+enter the sbt console with
+./script/sbt.sh
+
+important commads are
+
+update
+quit
+clean
+test
+compile
+~ compile
+console
+
+see also https://github.com/harrah/xsbt/wiki/Running

@@ -7,7 +7,8 @@
                  [org.clojure/data.json "0.2.6"]
                  [org.clojure/data.csv "0.1.3"]
                  [org.clojure/tools.cli "0.3.5"]
-                 [com.taoensso/timbre "4.10.0"]]
+                 [com.taoensso/timbre "4.10.0"]
+                 [debugger "0.2.0"]]
   :main ^:skip-aot machinery.core
   :target-path "target/%s"
   :jvm-opts ["-Xmx50g"]

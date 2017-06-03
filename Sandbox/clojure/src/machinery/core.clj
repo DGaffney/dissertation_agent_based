@@ -1,5 +1,6 @@
 (ns machinery.core
   (:require [clojure.data.json :as json]
+            [clojure.data.generators :as generators]
             [clojure.data.csv :as csv]
             [clojure.java.io :as io]
             [clojure.tools.cli :refer [parse-opts]]
@@ -19,7 +20,7 @@
 (def cli-options
   ;; An option with a required argument
   [["-w" "--walk WALK-TYPE" "Type of Walk to run"
-    :default "random-walk"]
+    :default "weighted-random-walk-restart-10pc"]
     ["-p" "--path PATH" "File path for observed data" :default "../larger_data"]])
 
 (def BATCH_SIZE 50) ; defines the batch size for walking
@@ -28,6 +29,7 @@
 ;; STATE -----------------------------------------------------------------------
 (def FUCKUPS (atom 0))
 (def WORLD (atom {}))
+(def NODES (atom []))
 (def SELF_LOOP_PCT (ref {}))
 (def SUBREDDIT_COUNTS (ref {}))
 (def SUBREDDIT_USER_COUNTS (ref {}))
@@ -35,7 +37,7 @@
 (def s-l-s-u-c (ref {}))
 (def n-s-l-s-u-c (ref {}))
 (def DAYS (atom []))
-(def RANDOM_WALK_ALGORITHM (atom "random-walk"))
+(def RANDOM_WALK_ALGORITHM (atom "weighted-random-walk-restart-10pc"))
 (def FILEPATH (atom "../larger_data"))
 (def LAST_VISITS (atom {}))
 (def LAST_VISIT_SELF_LOOP (atom {}))
@@ -115,7 +117,10 @@ a long in ms."
 
 (defn update-world!
   [day]
-  (swap! WORLD #(merge-with into % (slurp-edges-map day))))
+  (swap! WORLD #(merge-with into % (slurp-edges-map day)))
+  (if (not (= nil (keys @WORLD)))
+  (reset! NODES (into [] (keys @WORLD))))
+  )
 
 (defn log-day
   [day]
@@ -227,6 +232,22 @@ a long in ms."
     (let [step (-> @WORLD current-node rand-nth)]
       (if (= nil step) [(rand-nth (keys @WORLD)) true] [step true]))))
 
+(defn walk-with-restart
+  "Performs a single traverse"
+  [current-node percent]
+  (if (> percent (rand))
+    (if (= (count @WORLD) 0) [current-node false] [(rand-nth @NODES) true])
+    (walk current-node)))
+
+;ALTERNATIVE IDEA: pre-seed a vector with a certain number of sampled weighted values, then-rand-nth from that - small subreddits will never
+;attract any since they rarely appear in this vector, but this may be much faster and a good enough approximation of what is desired.
+(defn weighted-walk-with-restart
+  "Performs a single traverse"
+  [current-node percent]
+  (if (> percent (rand))
+    (if (= (count @WORLD) 0) [current-node false] [(generators/weighted @SUBREDDIT_COUNTS) true])
+    (walk current-node)))
+
 (defn random-walk
   "Performs the random walk"
   [username total-steps]
@@ -239,10 +260,43 @@ a long in ms."
           (recur (conj history [first-step first-step-self-loop]))
           (recur (conj history (walk (first (last history))))))))))
 
+(defn random-walk-restart
+  "Performs the random walk"
+  [username total-steps percent]
+  (let [first-step  (get @LAST_VISITS username)
+        first-step-self-loop  (get @LAST_VISIT_SELF_LOOP username)]
+    (loop [history []]
+      (if (= (count history) total-steps) ; we have as much history as steps
+        history
+        (if (empty? history)
+          (recur (conj history [first-step first-step-self-loop]))
+          (recur (conj history (walk-with-restart (first (last history)) percent))))))))
+
+(defn weighted-random-walk-restart
+  "Performs the random walk"
+  [username total-steps percent]
+  (let [first-step  (get @LAST_VISITS username)
+        first-step-self-loop  (get @LAST_VISIT_SELF_LOOP username)]
+    (loop [history []]
+      (if (= (count history) total-steps) ; we have as much history as steps
+        history
+        (if (empty? history)
+          (recur (conj history [first-step first-step-self-loop]))
+          (recur (conj history (weighted-walk-with-restart (first (last history)) percent))))))))
+
 (defn run-random-walk
   [username total-steps]
   (cond 
-    (= @RANDOM_WALK_ALGORITHM "random-walk") (random-walk username total-steps)))
+    (= @RANDOM_WALK_ALGORITHM "random-walk") (random-walk username total-steps)
+    (= @RANDOM_WALK_ALGORITHM "random-walk-restart-10pc") (random-walk-restart username total-steps 0.10)
+    (= @RANDOM_WALK_ALGORITHM "random-walk-restart-40pc") (random-walk-restart username total-steps 0.40)
+    (= @RANDOM_WALK_ALGORITHM "random-walk-restart-70pc") (random-walk-restart username total-steps 0.70)
+    (= @RANDOM_WALK_ALGORITHM "random-walk-restart-90pc") (random-walk-restart username total-steps 0.90)
+    (= @RANDOM_WALK_ALGORITHM "weighted-random-walk-restart-10pc") (weighted-random-walk-restart username total-steps 0.10)
+    (= @RANDOM_WALK_ALGORITHM "weighted-random-walk-restart-40pc") (weighted-random-walk-restart username total-steps 0.40)
+    (= @RANDOM_WALK_ALGORITHM "weighted-random-walk-restart-70pc") (weighted-random-walk-restart username total-steps 0.70)
+    (= @RANDOM_WALK_ALGORITHM "weighted-random-walk-restart-90pc") (weighted-random-walk-restart username total-steps 0.90)
+))
 
 (defn run-and-measure-walk
   [walker-pair]
@@ -386,6 +440,7 @@ a long in ms."
   (timbre/swap-config! assoc-in [:appenders :println :enabled?] false)
   ; BEGIN MAIN RUN LOOP
   (doseq [day (sort @DAYS)]
+    (println @RANDOM_WALK_ALGORITHM)
     ; timestamp the start of this iteration
     (def iteration-start-ms (millis))
     ; Make world adjustments; these have to be done in sequence: world, loops, visits
