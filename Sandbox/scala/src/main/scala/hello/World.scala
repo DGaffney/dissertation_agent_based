@@ -43,7 +43,7 @@ def updateSelfLoopPcts(day: String):HashMap[Symbol, Float] = {
   new_self_loops
 }
 def updateWorld(day: String, world: HashMap[Symbol, ArrayBuffer[Symbol]]):HashMap[Symbol, ArrayBuffer[Symbol]] = {
-  var world_updates = (parse(new String(Files.readAllBytes(Paths.get("../larger_data/cumulative_daily_nets_new_scalaed2/"+day)), UTF_8)) \ "subreddit_edges").extract[List[SubredditEdges]]
+  var world_updates = (parse(new String(Files.readAllBytes(Paths.get("../larger_data/cumulative_daily_nets/"+day)), UTF_8)) \ "subreddit_edges").extract[List[SubredditEdges]]
   for (subreddit <- world_updates) {
     var sub_sym = Symbol(subreddit.subreddit)
     if (!world.contains(sub_sym)){
