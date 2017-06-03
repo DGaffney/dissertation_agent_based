@@ -1,4 +1,4 @@
-Grab the full dataset [here](http://yourdefaulthomepage.com/larger_data.zip).
+Grab the test data (2005-06-23->2009-12-31) [here](http://devingaffney.com/files/test_data.zip).
 
 This provides four folders:
 
