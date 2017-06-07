@@ -439,7 +439,7 @@ a long in ms."
   (timbre/merge-config! {:appenders {:spit (merge (appenders/spit-appender {:fname @FILENAME}) {:async? true})}})
   (timbre/swap-config! assoc-in [:appenders :println :enabled?] false)
   ; BEGIN MAIN RUN LOOP
-  (doseq [day (sort @DAYS)]
+  (doseq [day (take 2000 (sort @DAYS))]
     (println @RANDOM_WALK_ALGORITHM)
     ; timestamp the start of this iteration
     (def iteration-start-ms (millis))
